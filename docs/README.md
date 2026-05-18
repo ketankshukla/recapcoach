@@ -11,17 +11,20 @@ The documents are split into two groups:
 
 ## Development chapters (read in order)
 
-| #   | Chapter                                                      | Summary                                                                                                                        |
-| --- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
-| 01  | [Overview](01-overview.md)                                   | What RecapCoach is, who it's for, the stack, current status, and what works end-to-end today.                                  |
-| 02  | [Initial scaffold](02-scaffold.md)                           | The starter project (Flutter + Riverpod + Firebase + RevenueCat) — what came pre-wired before feature work began.              |
-| 03  | [Audio recording + local notes](03-audio-recording.md)       | The `record` package, amplitude meter, Hive-backed `NoteRepository`, and the record/detail UI.                                 |
-| 04  | [Transcription backend](04-transcription-backend.md)         | The Vercel serverless `/api/transcribe` endpoint (Whisper + gpt-4o-mini) and the Flutter `TranscriptionService` that calls it. |
-| 05  | [Playback + amplitude bug fix](05-playback-and-amplitude.md) | Adding `just_audio` playback to the detail screen and fixing the amplitude meter dying after the first recording.              |
-| 06  | [Cloud sync](06-cloud-sync.md)                               | Firestore-backed text sync so notes survive uninstall/reinstall and follow the user across devices.                            |
-| 07  | [Architecture](07-architecture.md)                           | Full data-flow diagram, layer responsibilities, and the rationale for major decisions.                                         |
-| 08  | [Roadmap](08-roadmap.md)                                     | What's still open, prioritized, with effort estimates.                                                                         |
-| 09  | [Quotas & safety](09-quotas-and-safety.md)                   | Hybrid pricing model, per-plan caps, server-side quota enforcement, Firestore data model, kill switch.                         |
+| #   | Chapter                                                      | Summary                                                                                                                                          |
+| --- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 01  | [Overview](01-overview.md)                                   | What RecapCoach is, who it's for, the stack, current status, and what works end-to-end today.                                                    |
+| 02  | [Initial scaffold](02-scaffold.md)                           | The starter project (Flutter + Riverpod + Firebase + RevenueCat) — what came pre-wired before feature work began.                                |
+| 03  | [Audio recording + local notes](03-audio-recording.md)       | The `record` package, amplitude meter, Hive-backed `NoteRepository`, and the record/detail UI.                                                   |
+| 04  | [Transcription backend](04-transcription-backend.md)         | The Vercel serverless `/api/transcribe` endpoint (Whisper + gpt-4o-mini) and the Flutter `TranscriptionService` that calls it.                   |
+| 05  | [Playback + amplitude bug fix](05-playback-and-amplitude.md) | Adding `just_audio` playback to the detail screen and fixing the amplitude meter dying after the first recording.                                |
+| 06  | [Cloud sync](06-cloud-sync.md)                               | Firestore-backed text sync so notes survive uninstall/reinstall and follow the user across devices.                                              |
+| 07  | [Architecture](07-architecture.md)                           | Full data-flow diagram, layer responsibilities, and the rationale for major decisions.                                                           |
+| 08  | [Roadmap](08-roadmap.md)                                     | What's still open, prioritized, with effort estimates.                                                                                           |
+| 09  | [Quotas & safety](09-quotas-and-safety.md)                   | Hybrid pricing model, per-plan caps, server-side quota enforcement, Firestore data model, kill switch.                                           |
+| 10  | [Financial projections](10-financial-projections.md)         | Exact revenue + cost math at 1K / 10K / 100K / 1M users, sensitivity analysis, additional safety + profit levers.                                |
+| 11  | [Test plan](11-test-plan.md)                                 | Full catalogue of ~120 tests (unit / widget / integration / backend) including all payment + quota scenarios. Priority order for shipping.       |
+| 12  | [Solo developer playbook](12-solo-developer-playbook.md)     | The realistic operational guide for running a paid app alone: support load by scale, anti-feature-creep rules, runbook, mental-health protocols. |
 
 ## Operational guides
 
@@ -46,9 +49,11 @@ The documents are split into two groups:
 
 ## Last updated
 
-This snapshot reflects the state of `main` after the **monetization safety net** milestone:
+This snapshot reflects the state of `main` after the **monetization safety net** + **business planning** milestone:
 
 - Firebase ID token auth on `/api/transcribe` (chapter 04 + 08).
 - Hybrid pricing model with server-side quotas, kill switch, and live usage meter in the app (chapter 09).
+- Financial projections + test plan + solo-developer playbook (chapters 10-12).
+- Starter unit tests for the monetization foundation (40 tests, all passing).
 
 Update this doc when you ship the next significant milestone (RevenueCat product wiring, UI overhaul, Play Store closed testing, etc.).

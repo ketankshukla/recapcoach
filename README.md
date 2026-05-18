@@ -55,22 +55,25 @@ Margin per Pro user at maximum usage: ~58% after Google Play's 15% subscription 
 
 The `docs/` folder contains a complete chapter-by-chapter build log plus operational guides.
 
-| Doc                                                                    | Read it for                                                       |
-| ---------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| **[docs/README.md](docs/README.md)**                                   | Documentation index — start here                                  |
-| [docs/01-overview.md](docs/01-overview.md)                             | What RecapCoach is, who it's for, current status                  |
-| [docs/02-scaffold.md](docs/02-scaffold.md)                             | The starter project's pre-wired plumbing                          |
-| [docs/03-audio-recording.md](docs/03-audio-recording.md)               | Adding the mic capture + local notes                              |
-| [docs/04-transcription-backend.md](docs/04-transcription-backend.md)   | The Vercel + OpenAI pipeline                                      |
-| [docs/05-playback-and-amplitude.md](docs/05-playback-and-amplitude.md) | Adding playback; fixing the amplitude bug                         |
-| [docs/06-cloud-sync.md](docs/06-cloud-sync.md)                         | Firestore-backed sync so notes survive uninstall                  |
-| [docs/07-architecture.md](docs/07-architecture.md)                     | Full system diagram + design decisions                            |
-| [docs/08-roadmap.md](docs/08-roadmap.md)                               | What's still open, prioritized                                    |
-| [docs/09-quotas-and-safety.md](docs/09-quotas-and-safety.md)           | Hybrid pricing, per-plan caps, kill switch, Firestore usage model |
-| [docs/SETUP.md](docs/SETUP.md)                                         | First-time Windows toolchain install                              |
-| [docs/PUBLISH.md](docs/PUBLISH.md)                                     | Play Store closed testing checklist                               |
-| [docs/PRIVACY_POLICY_TEMPLATE.md](docs/PRIVACY_POLICY_TEMPLATE.md)     | Privacy policy template                                           |
-| [docs/TERMS_TEMPLATE.md](docs/TERMS_TEMPLATE.md)                       | Terms of service template                                         |
+| Doc                                                                      | Read it for                                                             |
+| ------------------------------------------------------------------------ | ----------------------------------------------------------------------- |
+| **[docs/README.md](docs/README.md)**                                     | Documentation index — start here                                        |
+| [docs/01-overview.md](docs/01-overview.md)                               | What RecapCoach is, who it's for, current status                        |
+| [docs/02-scaffold.md](docs/02-scaffold.md)                               | The starter project's pre-wired plumbing                                |
+| [docs/03-audio-recording.md](docs/03-audio-recording.md)                 | Adding the mic capture + local notes                                    |
+| [docs/04-transcription-backend.md](docs/04-transcription-backend.md)     | The Vercel + OpenAI pipeline                                            |
+| [docs/05-playback-and-amplitude.md](docs/05-playback-and-amplitude.md)   | Adding playback; fixing the amplitude bug                               |
+| [docs/06-cloud-sync.md](docs/06-cloud-sync.md)                           | Firestore-backed sync so notes survive uninstall                        |
+| [docs/07-architecture.md](docs/07-architecture.md)                       | Full system diagram + design decisions                                  |
+| [docs/08-roadmap.md](docs/08-roadmap.md)                                 | What's still open, prioritized                                          |
+| [docs/09-quotas-and-safety.md](docs/09-quotas-and-safety.md)             | Hybrid pricing, per-plan caps, kill switch, Firestore usage model       |
+| [docs/10-financial-projections.md](docs/10-financial-projections.md)     | Exact revenue + cost math at 1K / 10K / 100K / 1M users + safety levers |
+| [docs/11-test-plan.md](docs/11-test-plan.md)                             | ~120 test catalogue across unit / widget / integration / backend layers |
+| [docs/12-solo-developer-playbook.md](docs/12-solo-developer-playbook.md) | Realistic operational guide for running a paid app alone                |
+| [docs/SETUP.md](docs/SETUP.md)                                           | First-time Windows toolchain install                                    |
+| [docs/PUBLISH.md](docs/PUBLISH.md)                                       | Play Store closed testing checklist                                     |
+| [docs/PRIVACY_POLICY_TEMPLATE.md](docs/PRIVACY_POLICY_TEMPLATE.md)       | Privacy policy template                                                 |
+| [docs/TERMS_TEMPLATE.md](docs/TERMS_TEMPLATE.md)                         | Terms of service template                                               |
 
 ## Project layout
 
@@ -107,6 +110,10 @@ recapcoach/
 │  │  └─ usage/            monthly UsageSnapshot model + live Firestore stream
 │  └─ shared/              cross-feature providers + services
 ├─ docs/                   Documentation (see above)
+├─ test/                   Flutter unit + widget tests
+│  └─ features/
+│     ├─ usage/            UsageSnapshot math + currentUtcMonthKey UTC rollover tests
+│     └─ transcription/    TranscriptionException / error-kind sanity tests
 ├─ firestore.rules         Per-user isolation + read-only usage docs + admin-only /config/global
 ├─ vercel.json             Backend deploy config
 ├─ package.json            Backend npm deps (openai, formidable, firebase-admin, music-metadata, @vercel/node)
@@ -144,6 +151,24 @@ flutter build appbundle --release --dart-define=BACKEND_URL=https://recapcoach.v
 The `--dart-define=BACKEND_URL=...` flag is required for transcription to work. Without it, recordings are saved locally but never transcribed.
 
 See [docs/PUBLISH.md](docs/PUBLISH.md) for the full Play Store closed-testing checklist.
+
+## Tests
+
+```powershell
+# Flutter unit + widget tests (~40 tests, runs in seconds)
+flutter test
+
+# Static analysis (zero issues in app code; existing infos are pre-existing)
+flutter analyze --no-fatal-infos
+
+# TypeScript type-check on the Vercel backend
+npm run build
+```
+
+The complete test catalogue (current + planned) lives in
+[docs/11-test-plan.md](docs/11-test-plan.md). It enumerates ~120 tests
+across unit / widget / integration / backend layers, with payment + quota
+scenarios listed first because those guard real money.
 
 ## License
 
