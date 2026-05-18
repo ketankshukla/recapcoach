@@ -70,10 +70,12 @@ class AudioRecorderService {
     }
   }
 
-  /// Periodic amplitude updates suitable for a meter.
-  Stream<Amplitude> amplitudeStream() {
-    return _recorder.onAmplitudeChanged(const Duration(milliseconds: 200));
-  }
+  /// One-shot amplitude read. Call from a periodic timer at the polling
+  /// rate you want (e.g. every 200ms) instead of using the package's
+  /// `onAmplitudeChanged` stream, which closes for good when the recorder
+  /// stops and never re-emits on a subsequent recording with the same
+  /// `AudioRecorder` instance.
+  Future<Amplitude> getAmplitude() => _recorder.getAmplitude();
 
   void dispose() {
     _recorder.dispose();

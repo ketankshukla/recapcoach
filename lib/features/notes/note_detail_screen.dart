@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'note.dart';
+import 'note_player.dart';
 import 'note_providers.dart';
 
 class NoteDetailScreen extends ConsumerWidget {
@@ -36,6 +37,11 @@ class NoteDetailScreen extends ConsumerWidget {
         padding: const EdgeInsets.all(16),
         children: [
           _MetadataCard(note: note),
+          const SizedBox(height: 12),
+          NotePlayer(
+            key: ValueKey(note.audioFilePath),
+            audioFilePath: note.audioFilePath,
+          ),
           const SizedBox(height: 16),
           _Section(
             title: 'Summary',

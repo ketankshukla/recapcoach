@@ -1,8 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:record/record.dart';
 
+import '../../core/logging/logger.dart';
 import 'audio_recorder_service.dart';
 
 final audioRecorderProvider = Provider<AudioRecorderService>((ref) {
@@ -46,31 +46,55 @@ class RecordingController extends StateNotifier<RecordingState> {
 
   final AudioRecorderService _svc;
   Timer? _ticker;
-  StreamSubscription<Amplitude>? _ampSub;
+  int _ampSamples = 0;
 
   /// Returns false if mic permission was denied.
   Future<bool> start() async {
     if (!await _svc.hasPermission()) return false;
     await _svc.start();
+    _ampSamples = 0;
     state = const RecordingState(
       isRecording: true,
       elapsedMs: 0,
       amplitudeDb: -160,
     );
-    _ticker = Timer.periodic(const Duration(milliseconds: 200), (_) {
-      state = state.copyWith(elapsedMs: state.elapsedMs + 200);
-    });
-    _ampSub = _svc.amplitudeStream().listen((a) {
-      state = state.copyWith(amplitudeDb: a.current);
-    });
+    // Single timer drives both elapsed-time and amplitude polling. We avoid
+    // the `record` package's `onAmplitudeChanged` stream because it closes
+    // permanently when the recorder stops, breaking amplitude on every
+    // subsequent recording in the same app session.
+    _ticker = Timer.periodic(
+      const Duration(milliseconds: 200),
+      (_) => _onTick(),
+    );
     return true;
+  }
+
+  Future<void> _onTick() async {
+    if (!state.isRecording) return;
+    final nextElapsed = state.elapsedMs + 200;
+    try {
+      final amp = await _svc.getAmplitude();
+      if (!state.isRecording) return; // stopped while awaiting
+      // Log once per second so we can verify the mic is reporting amplitude.
+      if (_ampSamples++ % 5 == 0) {
+        logger.info('mic amp=${amp.current.toStringAsFixed(1)}dB '
+            '(max=${amp.max.toStringAsFixed(1)}dB)');
+      }
+      state = state.copyWith(
+        elapsedMs: nextElapsed,
+        amplitudeDb: amp.current,
+      );
+    } catch (e) {
+      // Amplitude polling can fail transiently; still advance the clock so
+      // the UI doesn't appear frozen.
+      logger.warning('getAmplitude failed: $e');
+      state = state.copyWith(elapsedMs: nextElapsed);
+    }
   }
 
   Future<RecordingResult?> stop() async {
     _ticker?.cancel();
     _ticker = null;
-    await _ampSub?.cancel();
-    _ampSub = null;
     final result = await _svc.stop();
     state = const RecordingState();
     return result;
@@ -79,8 +103,6 @@ class RecordingController extends StateNotifier<RecordingState> {
   Future<void> cancel() async {
     _ticker?.cancel();
     _ticker = null;
-    await _ampSub?.cancel();
-    _ampSub = null;
     await _svc.cancel();
     state = const RecordingState();
   }
@@ -88,7 +110,6 @@ class RecordingController extends StateNotifier<RecordingState> {
   @override
   void dispose() {
     _ticker?.cancel();
-    _ampSub?.cancel();
     super.dispose();
   }
 }
