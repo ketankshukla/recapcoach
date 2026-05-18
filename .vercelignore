@@ -1,0 +1,29 @@
+# Flutter app files (not needed on the API server)
+android/
+ios/
+linux/
+macos/
+windows/
+web/
+lib/
+test/
+build/
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+pubspec.yaml
+pubspec.lock
+analysis_options.yaml
+firebase.json
+firebase_options.dart
+flutter_app_kit/
+assets/
+
+# Docs / scratch
+docs/
+debug-sha.txt
+*.md
+
+# IDE
+.vscode/
+.idea/

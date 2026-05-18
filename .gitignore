@@ -56,3 +56,11 @@ coverage/
 
 # Local scratchpads
 debug-sha.txt
+
+# Node / Vercel (for the /api serverless backend)
+node_modules/
+.vercel/
+.env.local
+.env.development.local
+.env.production.local
+*.tsbuildinfo

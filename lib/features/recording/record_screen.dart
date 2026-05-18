@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -5,8 +7,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../core/logging/logger.dart';
 import '../notes/note.dart';
 import '../notes/note_providers.dart';
+import '../notes/note_repository.dart';
+import '../transcription/transcription_providers.dart';
+import '../transcription/transcription_service.dart';
 import 'recording_providers.dart';
 
 class RecordScreen extends ConsumerStatefulWidget {
@@ -53,8 +59,14 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
   }
 
   Future<void> _stopAndSave() async {
+    // Capture providers BEFORE we pop, because after pop the ConsumerState
+    // is unmounted and `ref` is no longer usable.
+    final repo = ref.read(noteRepositoryProvider);
+    final transcriber = ref.read(transcriptionServiceProvider);
+
     final result = await ref.read(recordingControllerProvider.notifier).stop();
     if (!mounted) return;
+
     if (result == null) {
       context.pop();
       return;
@@ -62,23 +74,67 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
     if (result.durationMs < 1500) {
       // Too short to be useful — discard.
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Recording too short. Try again.'),
-        ),
+        const SnackBar(content: Text('Recording too short. Try again.')),
       );
       context.pop();
       return;
     }
+
+    // Save the note immediately with isProcessing=true so it shows up on the
+    // home screen with a spinner. Transcription runs in the background and
+    // updates the same note when it finishes.
     final note = Note(
       id: const Uuid().v4(),
       audioFilePath: result.filePath,
       createdAt: DateTime.now(),
       durationMs: result.durationMs,
-      isProcessing: false, // Will flip to true once we wire the backend.
+      isProcessing: transcriber.isConfigured,
     );
-    await ref.read(noteRepositoryProvider).upsert(note);
+    await repo.upsert(note);
     if (!mounted) return;
     context.pop();
+
+    // Fire-and-forget transcription. Errors are logged and persisted on the
+    // note's `processingError` field so the detail screen can show them.
+    unawaited(_runTranscription(repo, transcriber, note));
+  }
+
+  /// Top-level (post-pop) transcription runner. Does NOT touch `ref` or
+  /// `BuildContext` — only the captured repo & service, both root-scoped.
+  Future<void> _runTranscription(
+    NoteRepository repo,
+    TranscriptionService transcriber,
+    Note initial,
+  ) async {
+    if (!transcriber.isConfigured) {
+      logger.warning(
+        'BACKEND_URL not set; skipping transcription for note ${initial.id}.',
+      );
+      return;
+    }
+    try {
+      final result = await transcriber.transcribe(File(initial.audioFilePath));
+      // Re-fetch in case anything else changed the note in the meantime.
+      final current = repo.byId(initial.id) ?? initial;
+      final updated = current.copyWith(
+        transcript: result.transcript,
+        summary: result.summary,
+        actionItems: result.actionItems,
+        isProcessing: false,
+        clearError: true,
+        processingError: result.warning,
+      );
+      await repo.upsert(updated);
+      logger.info('Transcription complete for note ${initial.id}.');
+    } catch (e, st) {
+      logger.error('Transcription failed for note ${initial.id}', e, st);
+      final current = repo.byId(initial.id) ?? initial;
+      final failed = current.copyWith(
+        isProcessing: false,
+        processingError: e.toString(),
+      );
+      await repo.upsert(failed);
+    }
   }
 
   Future<void> _cancel() async {
