@@ -40,6 +40,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       ref.read(analyticsProvider).track(AnalyticsEvents.onboardingStart);
     });
   }

@@ -53,3 +53,6 @@ Thumbs.db
 
 # Coverage
 coverage/
+
+# Local scratchpads
+debug-sha.txt

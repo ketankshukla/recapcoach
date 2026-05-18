@@ -146,6 +146,13 @@ class _AccountCard extends StatelessWidget {
             ),
             if (!isPro)
               FilledButton(
+                // Override the global FilledButton minimumSize, which uses
+                // Size.fromHeight(52) (== Size(infinity, 52)) and crashes
+                // when the button lives inside a Row giving unbounded width.
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(64, 40),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                ),
                 onPressed: () => context.push(AppRoutes.paywall),
                 child: const Text('Upgrade'),
               ),

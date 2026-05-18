@@ -69,6 +69,14 @@ dependencies:
 
   cupertino_icons: ^1.0.8
 
+# Force compatible Linux implementation of `record`.
+# `record: ^5.1.2` resolves `record_linux 0.7.2`, which is incompatible with
+# the newer `record_platform_interface` it also pulls in (missing `startStream`
+# and wrong `hasPermission` signature). This breaks even Android builds because
+# Dart compiles all platform implementations.
+dependency_overrides:
+  record_linux: ^1.3.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
