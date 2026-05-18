@@ -11,6 +11,10 @@ behind a single endpoint so the app never sees the OpenAI API key.
 Multipart upload. One field, `audio`, containing an audio file
 (`audio/m4a` / `audio/aac` recommended, but Whisper accepts mp3, wav, webm, etc).
 
+**Required header:** `Authorization: Bearer <Firebase ID token>`. The server
+verifies the token with the Firebase Admin SDK; anonymous requests are
+rejected with `401`.
+
 **Response (200):**
 
 ```json
@@ -27,16 +31,27 @@ Multipart upload. One field, `audio`, containing an audio file
 **Errors:**
 
 - `400` — no audio file, malformed multipart, file > 25 MB
+- `401` — missing or invalid Firebase ID token
 - `405` — wrong method (only POST is allowed)
-- `500` — missing `OPENAI_API_KEY`, OpenAI request failed
+- `500` — server misconfigured (missing env var) or OpenAI request failed
 
 ## Required environment variables
 
-Set in **Vercel → Project → Settings → Environment Variables**:
+Set in **Vercel → Project → Settings → Environment Variables**, all **Encrypted**:
 
-| Name             | Where it goes | Example                       |
-| ---------------- | ------------- | ----------------------------- |
-| `OPENAI_API_KEY` | Encrypted     | `sk-proj-...`                 |
+| Name                    | Source                                                                  |
+| ----------------------- | ----------------------------------------------------------------------- |
+| `OPENAI_API_KEY`        | OpenAI dashboard → API keys                                             |
+| `FIREBASE_PROJECT_ID`   | Firebase Console → Project settings → General → Project ID              |
+| `FIREBASE_CLIENT_EMAIL` | `client_email` from a downloaded service account JSON                   |
+| `FIREBASE_PRIVATE_KEY`  | `private_key` from the same JSON (paste the full BEGIN/END block as-is) |
+
+To generate the service account JSON:
+
+1. Firebase Console → Project settings → **Service accounts** tab
+2. Click **Generate new private key** → confirm
+3. A JSON file downloads — copy `client_email` and `private_key` into Vercel
+4. Never commit this JSON to git
 
 ## Deployment
 
@@ -81,10 +96,6 @@ Set a billing cap in your OpenAI dashboard while testing.
 
 ## Security TODO (post-MVP)
 
-The endpoint is currently anonymous — anyone with the URL can spam it and burn
-your credits. Before publishing the app:
-
-1. Send the user's Firebase ID token from Flutter:
-   `Authorization: Bearer <idToken>`
-2. Verify it on the server with `firebase-admin` SDK.
-3. Optional: rate-limit per Firebase UID using Upstash Redis or Vercel KV.
+- [x] Verify Firebase ID token on every request (shipped)
+- [ ] Rate-limit per Firebase UID using Upstash Redis or Vercel KV
+- [ ] Add request signing or CSRF token for additional defense-in-depth

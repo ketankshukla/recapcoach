@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../core/config/env.dart';
 import '../../core/logging/logger.dart';
@@ -68,6 +69,25 @@ class TranscriptionService {
       );
     }
 
+    // The backend requires a Firebase ID token. If the user isn't signed in,
+    // we can't transcribe -- fail fast with a clear message.
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      throw TranscriptionException(
+        'You must be signed in to transcribe recordings.',
+      );
+    }
+    final String idToken;
+    try {
+      final t = await user.getIdToken();
+      if (t == null || t.isEmpty) {
+        throw TranscriptionException('Could not obtain a Firebase ID token.');
+      }
+      idToken = t;
+    } on FirebaseAuthException catch (e) {
+      throw TranscriptionException('Auth error: ${e.message ?? e.code}');
+    }
+
     final url = '${Env.backendUrl.replaceAll(RegExp(r'/+$'), '')}/api/transcribe';
     logger.info('Uploading audio to $url (${audio.lengthSync()} bytes)');
 
@@ -86,6 +106,9 @@ class TranscriptionService {
           // Let Dio set the multipart boundary header itself.
           contentType: 'multipart/form-data',
           responseType: ResponseType.json,
+          headers: <String, String>{
+            'Authorization': 'Bearer $idToken',
+          },
         ),
       );
       final data = res.data;

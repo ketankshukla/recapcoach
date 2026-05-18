@@ -17,15 +17,23 @@
  *
  * Errors:
  *   400 - no audio file / file too large
- *   500 - OpenAI failure
+ *   401 - missing/invalid Firebase ID token
+ *   500 - OpenAI failure / server misconfigured
  *
- * Env:
- *   OPENAI_API_KEY - required, set in Vercel project settings (Encrypted).
+ * Auth:
+ *   Caller MUST send `Authorization: Bearer <Firebase ID token>`.
+ *
+ * Env (set in Vercel project settings, all Encrypted):
+ *   OPENAI_API_KEY         - OpenAI secret key
+ *   FIREBASE_PROJECT_ID    - e.g. "recapcoach-dev"
+ *   FIREBASE_CLIENT_EMAIL  - from the service account JSON
+ *   FIREBASE_PRIVATE_KEY   - from the service account JSON (\n preserved)
  */
-import type { VercelRequest, VercelResponse } from '@vercel/node';
-import OpenAI from 'openai';
-import formidable from 'formidable';
-import fs from 'fs';
+import type { VercelRequest, VercelResponse } from "@vercel/node";
+import OpenAI from "openai";
+import formidable from "formidable";
+import fs from "fs";
+import { requireFirebaseUser } from "./_lib/firebase-admin";
 
 // Disable Vercel's default JSON body parser; we handle multipart ourselves.
 export const config = {
@@ -61,19 +69,26 @@ interface SummaryResponse {
 
 export default async function handler(
   req: VercelRequest,
-  res: VercelResponse,
+  res: VercelResponse
 ): Promise<void> {
-  if (req.method !== 'POST') {
-    res.setHeader('Allow', 'POST');
-    res.status(405).json({ error: 'Method not allowed' });
+  if (req.method !== "POST") {
+    res.setHeader("Allow", "POST");
+    res.status(405).json({ error: "Method not allowed" });
     return;
   }
+
+  // ---- 0. Verify the Firebase ID token ----
+  // Rejects with 401 (bad/missing token) or 500 (server not configured).
+  // No anonymous access permitted - this gate is what protects the OpenAI key.
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return;
+  console.log(`[transcribe] uid=${user.uid} email=${user.email ?? "(none)"}`);
 
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     res
       .status(500)
-      .json({ error: 'Server misconfigured: OPENAI_API_KEY is not set' });
+      .json({ error: "Server misconfigured: OPENAI_API_KEY is not set" });
     return;
   }
 
@@ -93,8 +108,8 @@ export default async function handler(
       return;
     }
     audioPath = audio.filepath;
-    audioMime = audio.mimetype ?? 'audio/m4a';
-    audioFilename = audio.originalFilename ?? 'recording.m4a';
+    audioMime = audio.mimetype ?? "audio/m4a";
+    audioFilename = audio.originalFilename ?? "recording.m4a";
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
     res.status(400).json({ error: `Could not parse upload: ${message}` });
@@ -108,8 +123,8 @@ export default async function handler(
   try {
     const transcription = await openai.audio.transcriptions.create({
       file: fs.createReadStream(audioPath),
-      model: 'whisper-1',
-      response_format: 'json',
+      model: "whisper-1",
+      response_format: "json",
     });
     transcript = transcription.text.trim();
   } catch (err: unknown) {
@@ -123,8 +138,8 @@ export default async function handler(
 
   if (transcript.length === 0) {
     res.status(200).json({
-      transcript: '',
-      summary: '(No speech detected.)',
+      transcript: "",
+      summary: "(No speech detected.)",
       actionItems: [],
     });
     return;
@@ -134,24 +149,24 @@ export default async function handler(
   let parsed: SummaryResponse;
   try {
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: "gpt-4o-mini",
       temperature: 0.2,
-      response_format: { type: 'json_object' },
+      response_format: { type: "json_object" },
       messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
+        { role: "system", content: SYSTEM_PROMPT },
         {
-          role: 'user',
+          role: "user",
           content: `Transcript of the call (JSON output required):\n\n${transcript}`,
         },
       ],
     });
 
-    const raw = completion.choices[0]?.message?.content ?? '{}';
+    const raw = completion.choices[0]?.message?.content ?? "{}";
     const obj = JSON.parse(raw) as Partial<SummaryResponse>;
     parsed = {
-      summary: typeof obj.summary === 'string' ? obj.summary.trim() : '',
+      summary: typeof obj.summary === "string" ? obj.summary.trim() : "",
       actionItems: Array.isArray(obj.actionItems)
-        ? obj.actionItems.filter((s): s is string => typeof s === 'string')
+        ? obj.actionItems.filter((s): s is string => typeof s === "string")
         : [],
     };
   } catch (err: unknown) {
@@ -159,7 +174,7 @@ export default async function handler(
     // Still return the transcript so the user doesn't lose it.
     res.status(200).json({
       transcript,
-      summary: '',
+      summary: "",
       actionItems: [],
       warning: `Summarization failed but transcript is available: ${message}`,
       audioFilename, // unused, kept to silence lint
