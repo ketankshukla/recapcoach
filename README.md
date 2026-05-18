@@ -6,9 +6,9 @@ Built for solo consultants and coaches who want their post-call admin done befor
 
 ## Status
 
-🟢 **Working end-to-end on real Android hardware.** Notes are recorded, transcribed via OpenAI Whisper + gpt-4o-mini through a Vercel backend, and synced to Firestore so they survive uninstall and follow the user across devices.
+🟢 **Working end-to-end on real Android hardware**, with the OpenAI key now protected behind Firebase auth **and** per-plan quotas. Notes are recorded, transcribed via OpenAI Whisper + gpt-4o-mini through a Vercel backend, and synced to Firestore so they survive uninstall and follow the user across devices.
 
-Next milestone: locking down the transcription endpoint with Firebase ID token auth, then audio cloud sync as a Pro feature, then Play Store closed testing.
+Next milestone: **UI overhaul** (professional theme, animated waveform, redesigned paywall + settings), then RevenueCat product wiring, then Play Store closed testing.
 
 See **[docs/](docs/README.md)** for the full chapter-by-chapter build log, architecture diagrams, and roadmap.
 
@@ -21,7 +21,21 @@ See **[docs/](docs/README.md)** for the full chapter-by-chapter build log, archi
 - ✅ Note list + detail screen with summary, action items, and full transcript
 - ✅ Cloud sync of note text to Firestore — survives uninstall + new device
 - ✅ Per-user data isolation via Firestore security rules
+- ✅ **Backend protected by Firebase ID token verification** — no anonymous access
+- ✅ **Server-side per-plan quotas** (Free: 5 recs / 15 min /mo · Pro: 100 recs / 8 hr /mo) with atomic monthly counters
+- ✅ **Live usage meter on the home screen** + pre-flight paywall when at cap
+- ✅ **Global kill switch** via `/config/global.transcriptionEnabled` for instant cost-leak response
 - ✅ Paywall (RevenueCat) + Remote Config + Crashlytics + Analytics wired
+
+## Monetization (Hybrid pricing)
+
+| Tier        | Price  | Caps                                    | Worst-case cost / user / month |
+| ----------- | ------ | --------------------------------------- | ------------------------------ |
+| Free        | $0     | 5 recordings, 3 min each, 15 min total  | ~$0.09                         |
+| Pro Monthly | $7.99  | 100 recordings, 20 min each, 8 hr total | ~$2.88                         |
+| Pro Yearly  | $49.99 | same as Pro Monthly                     | ~$2.88 / mo equivalent         |
+
+Margin per Pro user at maximum usage: ~58% after Google Play's 15% subscription fee. See [docs/09-quotas-and-safety.md](docs/09-quotas-and-safety.md) for the full design.
 
 ## Stack
 
@@ -41,28 +55,34 @@ See **[docs/](docs/README.md)** for the full chapter-by-chapter build log, archi
 
 The `docs/` folder contains a complete chapter-by-chapter build log plus operational guides.
 
-| Doc | Read it for |
-|---|---|
-| **[docs/README.md](docs/README.md)** | Documentation index — start here |
-| [docs/01-overview.md](docs/01-overview.md) | What RecapCoach is, who it's for, current status |
-| [docs/02-scaffold.md](docs/02-scaffold.md) | The starter project's pre-wired plumbing |
-| [docs/03-audio-recording.md](docs/03-audio-recording.md) | Adding the mic capture + local notes |
-| [docs/04-transcription-backend.md](docs/04-transcription-backend.md) | The Vercel + OpenAI pipeline |
-| [docs/05-playback-and-amplitude.md](docs/05-playback-and-amplitude.md) | Adding playback; fixing the amplitude bug |
-| [docs/06-cloud-sync.md](docs/06-cloud-sync.md) | Firestore-backed sync so notes survive uninstall |
-| [docs/07-architecture.md](docs/07-architecture.md) | Full system diagram + design decisions |
-| [docs/08-roadmap.md](docs/08-roadmap.md) | What's still open, prioritized |
-| [docs/SETUP.md](docs/SETUP.md) | First-time Windows toolchain install |
-| [docs/PUBLISH.md](docs/PUBLISH.md) | Play Store closed testing checklist |
-| [docs/PRIVACY_POLICY_TEMPLATE.md](docs/PRIVACY_POLICY_TEMPLATE.md) | Privacy policy template |
-| [docs/TERMS_TEMPLATE.md](docs/TERMS_TEMPLATE.md) | Terms of service template |
+| Doc                                                                    | Read it for                                                       |
+| ---------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| **[docs/README.md](docs/README.md)**                                   | Documentation index — start here                                  |
+| [docs/01-overview.md](docs/01-overview.md)                             | What RecapCoach is, who it's for, current status                  |
+| [docs/02-scaffold.md](docs/02-scaffold.md)                             | The starter project's pre-wired plumbing                          |
+| [docs/03-audio-recording.md](docs/03-audio-recording.md)               | Adding the mic capture + local notes                              |
+| [docs/04-transcription-backend.md](docs/04-transcription-backend.md)   | The Vercel + OpenAI pipeline                                      |
+| [docs/05-playback-and-amplitude.md](docs/05-playback-and-amplitude.md) | Adding playback; fixing the amplitude bug                         |
+| [docs/06-cloud-sync.md](docs/06-cloud-sync.md)                         | Firestore-backed sync so notes survive uninstall                  |
+| [docs/07-architecture.md](docs/07-architecture.md)                     | Full system diagram + design decisions                            |
+| [docs/08-roadmap.md](docs/08-roadmap.md)                               | What's still open, prioritized                                    |
+| [docs/09-quotas-and-safety.md](docs/09-quotas-and-safety.md)           | Hybrid pricing, per-plan caps, kill switch, Firestore usage model |
+| [docs/SETUP.md](docs/SETUP.md)                                         | First-time Windows toolchain install                              |
+| [docs/PUBLISH.md](docs/PUBLISH.md)                                     | Play Store closed testing checklist                               |
+| [docs/PRIVACY_POLICY_TEMPLATE.md](docs/PRIVACY_POLICY_TEMPLATE.md)     | Privacy policy template                                           |
+| [docs/TERMS_TEMPLATE.md](docs/TERMS_TEMPLATE.md)                       | Terms of service template                                         |
 
 ## Project layout
 
 ```
 recapcoach/
 ├─ api/                    Vercel serverless function (TypeScript)
-│  └─ transcribe.ts        POST /api/transcribe — Whisper + gpt-4o-mini
+│  ├─ transcribe.ts        POST /api/transcribe — auth + quota + Whisper + gpt-4o-mini
+│  └─ _lib/
+│     ├─ firebase-admin.ts Lazy-init Firebase Admin SDK + ID token verification
+│     ├─ limits.ts         Plan limits (FREE / PRO) — single source of truth
+│     ├─ quota.ts          Firestore quota counters + kill switch + assert helpers
+│     └─ audio-meta.ts     Server-side duration probe (music-metadata)
 ├─ public/                 Static landing page served at the bare URL
 ├─ lib/
 │  ├─ main.dart            App entry: Firebase, Hive, Riverpod, RevenueCat init
@@ -81,14 +101,15 @@ recapcoach/
 │  │  ├─ notes/            Note model, Hive + Firestore repos, sync, list/detail UI, player
 │  │  ├─ onboarding/       first-run flow
 │  │  ├─ paywall/          RevenueCat-backed paywall + entitlements
-│  │  ├─ recording/        mic capture + amplitude polling
+│  │  ├─ recording/        mic capture + amplitude polling + quota pre-flight
 │  │  ├─ settings/         settings screen
-│  │  └─ transcription/    Dio client for /api/transcribe
+│  │  ├─ transcription/    Dio client for /api/transcribe (typed errors)
+│  │  └─ usage/            monthly UsageSnapshot model + live Firestore stream
 │  └─ shared/              cross-feature providers + services
 ├─ docs/                   Documentation (see above)
-├─ firestore.rules         Per-user Firestore isolation rules
+├─ firestore.rules         Per-user isolation + read-only usage docs + admin-only /config/global
 ├─ vercel.json             Backend deploy config
-├─ package.json            Backend npm deps (openai, formidable, @vercel/node)
+├─ package.json            Backend npm deps (openai, formidable, firebase-admin, music-metadata, @vercel/node)
 ├─ tsconfig.json           TypeScript config for the function
 └─ pubspec.yaml            Flutter app deps
 ```

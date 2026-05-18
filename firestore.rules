@@ -3,10 +3,17 @@ rules_version = '2';
 // RecapCoach Firestore security rules.
 //
 // Data model:
-//   /users/{uid}/notes/{noteId}   <- private notes for one user
+//   /users/{uid}                       <- user profile + plan (plan written by backend only)
+//   /users/{uid}/notes/{noteId}        <- private notes for one user
+//   /users/{uid}/usage/{YYYY-MM}       <- monthly usage counters (backend-written, user-readable)
+//   /config/global                     <- global kill switch + limit overrides (admin-only)
 //
-// Each user can only read/write documents under their own /users/{uid} path.
-// All other reads and writes are denied by default.
+// Security model:
+//   - Users read+write their own notes.
+//   - Users read their own profile + usage docs but CANNOT mutate them
+//     (the backend, running as the service account, owns those writes so
+//     clients can't hand themselves Pro entitlement or zero out usage).
+//   - /config/global is locked down to admins via the service account.
 //
 // Deploy with:
 //   firebase deploy --only firestore:rules
@@ -16,10 +23,34 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    match /users/{uid}/{document=**} {
+    // The user's own profile doc. Read-only from the client; backend writes
+    // the `plan` field via the RevenueCat webhook (future) or admin tooling.
+    match /users/{uid} {
+      allow read:   if request.auth != null && request.auth.uid == uid;
+      allow write:  if false;
+    }
+
+    // Notes -- full CRUD by the owner.
+    match /users/{uid}/notes/{noteId} {
       allow read, write: if request.auth != null && request.auth.uid == uid;
     }
 
-    // Anything else is locked down by default. (No global match, no public access.)
+    // Usage counters -- readable by the owner so the app can show a meter,
+    // but only the backend (service account, bypasses rules) writes them.
+    match /users/{uid}/usage/{monthKey} {
+      allow read:  if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+    }
+
+    // Anything else under /users/{uid}/... is locked down explicitly.
+    // (We removed the previous catch-all wildcard match so that profile
+    // and usage docs require the stricter rules above.)
+
+    // Global config -- backend only.
+    match /config/{document=**} {
+      allow read, write: if false;
+    }
+
+    // Default deny everything else.
   }
 }

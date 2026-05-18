@@ -13,6 +13,7 @@
     "@vercel/node": "^3.2.24",
     "firebase-admin": "^12.6.0",
     "formidable": "^3.5.2",
+    "music-metadata": "^7.14.0",
     "openai": "^4.73.1"
   },
   "devDependencies": {

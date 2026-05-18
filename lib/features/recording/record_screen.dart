@@ -8,11 +8,14 @@ import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../core/logging/logger.dart';
+import '../../core/router/app_router.dart';
 import '../notes/note.dart';
 import '../notes/note_providers.dart';
 import '../notes/note_repository.dart';
 import '../transcription/transcription_providers.dart';
 import '../transcription/transcription_service.dart';
+import '../usage/usage.dart';
+import '../usage/usage_provider.dart';
 import 'recording_providers.dart';
 
 class RecordScreen extends ConsumerStatefulWidget {
@@ -35,6 +38,16 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
   Future<void> _autoStart() async {
     if (_starting) return;
     _starting = true;
+
+    // ---- Pre-flight quota check (client-side, advisory) ----
+    // The server is the source of truth and will reject 429 if the user is
+    // over quota, but bouncing them BEFORE they record saves a wasted recording.
+    final usage = ref.read(monthlyUsageProvider).value;
+    if (usage != null && usage.isAtCap && usage.plan != 'pro') {
+      await _showQuotaDialog(usage);
+      return;
+    }
+
     final ok = await ref.read(recordingControllerProvider.notifier).start();
     if (!mounted) return;
     if (!ok) {
@@ -56,6 +69,36 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
       );
       if (mounted) context.pop();
     }
+  }
+
+  Future<void> _showQuotaDialog(UsageSnapshot usage) async {
+    final usedMin = (usage.usedSeconds / 60).toStringAsFixed(0);
+    final limitMin = (usage.limitSeconds / 60).toStringAsFixed(0);
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Free plan limit reached'),
+        content: Text(
+          'You\'ve used $usedMin / $limitMin minutes this month '
+          '(${usage.usedRecordings} of ${usage.limitRecordings} recordings).\n\n'
+          'Upgrade to Pro to keep recording — 8 hours and 100 recordings every month.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Not now'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              context.pushReplacement(AppRoutes.paywall);
+            },
+            child: const Text('Upgrade'),
+          ),
+        ],
+      ),
+    );
+    if (mounted) context.pop();
   }
 
   Future<void> _stopAndSave() async {

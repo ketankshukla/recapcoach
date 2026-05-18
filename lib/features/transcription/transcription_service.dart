@@ -37,10 +37,26 @@ class TranscriptionResult {
 
 /// Thrown when the backend is not configured or the request fails.
 class TranscriptionException implements Exception {
-  TranscriptionException(this.message);
+  TranscriptionException(this.message, {this.kind = TranscriptionErrorKind.other});
   final String message;
+  final TranscriptionErrorKind kind;
   @override
   String toString() => 'TranscriptionException: $message';
+}
+
+/// Coarse-grained failure category, so the UI can react differently for
+/// recoverable errors (network, server) vs hard limits (quota, kill switch).
+enum TranscriptionErrorKind {
+  /// User-friendly: free quota exhausted, needs to upgrade.
+  quotaExceeded,
+  /// User-friendly: file exceeds the per-plan size cap.
+  fileTooLarge,
+  /// Transient: feature globally disabled by admin (rare).
+  disabled,
+  /// Auth problem (token missing / expired / invalid).
+  unauthorized,
+  /// Everything else: network, OpenAI down, decoding error, etc.
+  other,
 }
 
 /// Uploads an audio file to the RecapCoach backend (`POST /api/transcribe`)
@@ -118,11 +134,30 @@ class TranscriptionService {
       return TranscriptionResult.fromJson(data);
     } on DioException catch (e) {
       final body = e.response?.data;
+      final status = e.response?.statusCode ?? 0;
       final serverMsg = body is Map && body['error'] is String
           ? body['error'] as String
           : e.message ?? 'unknown error';
-      logger.error('Transcription HTTP error', e);
-      throw TranscriptionException(serverMsg);
+      logger.error('Transcription HTTP error (status=$status)', e);
+
+      TranscriptionErrorKind kind;
+      switch (status) {
+        case 401:
+          kind = TranscriptionErrorKind.unauthorized;
+          break;
+        case 413:
+          kind = TranscriptionErrorKind.fileTooLarge;
+          break;
+        case 429:
+          kind = TranscriptionErrorKind.quotaExceeded;
+          break;
+        case 503:
+          kind = TranscriptionErrorKind.disabled;
+          break;
+        default:
+          kind = TranscriptionErrorKind.other;
+      }
+      throw TranscriptionException(serverMsg, kind: kind);
     }
   }
 }

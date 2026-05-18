@@ -5,19 +5,31 @@
  * an audio file (m4a / aac-lc preferred, but Whisper accepts mp3, wav, webm, etc).
  *
  * Pipeline:
- *   1. Whisper-1: audio  -> transcript text
- *   2. gpt-4o-mini: transcript -> { summary, actionItems[] } JSON
+ *   0. Verify Firebase ID token (auth gate).
+ *   1. Load quota context: kill switch, plan, monthly usage.
+ *   2. Parse multipart upload (per-plan file-size cap).
+ *   3. Probe audio for real duration (server-side, can't be spoofed).
+ *   4. Assert within per-recording + per-month caps.
+ *   5. Whisper-1: audio  -> transcript text
+ *   6. gpt-4o-mini: transcript -> { summary, actionItems[] } JSON
+ *   7. Atomically increment usage counters in Firestore.
  *
  * Response (200):
  *   {
  *     "transcript":  string,
  *     "summary":     string,
- *     "actionItems": string[]
+ *     "actionItems": string[],
+ *     "usage": { plan, monthKey, usedSeconds, usedCount,
+ *                limitSeconds, limitCount, limitPerRecordingSeconds }
  *   }
  *
  * Errors:
- *   400 - no audio file / file too large
+ *   400 - no audio file / corrupt audio
  *   401 - missing/invalid Firebase ID token
+ *   413 - file too large for this plan
+ *   429 - quota exceeded ({ reason, plan, limits, used }) -- client should
+ *         prompt the user to upgrade and NOT retry
+ *   503 - transcription temporarily disabled (global kill switch flipped)
  *   500 - OpenAI failure / server misconfigured
  *
  * Auth:
@@ -34,6 +46,16 @@ import OpenAI from "openai";
 import formidable from "formidable";
 import fs from "fs";
 import { requireFirebaseUser } from "./_lib/firebase-admin";
+import {
+  loadQuotaContext,
+  assertFileSizeAllowed,
+  assertWithinMonthlyQuota,
+  recordUsage,
+  QuotaExceededError,
+  TranscriptionDisabledError,
+  type QuotaContext,
+} from "./_lib/quota";
+import { probeAudioFile } from "./_lib/audio-meta";
 
 // Disable Vercel's default JSON body parser; we handle multipart ourselves.
 export const config = {
@@ -41,8 +63,6 @@ export const config = {
     bodyParser: false,
   },
 };
-
-const MAX_AUDIO_BYTES = 25 * 1024 * 1024; // 25 MB (OpenAI Whisper's hard limit)
 
 const SYSTEM_PROMPT = `You are an assistant that summarizes phone-call transcripts for consultants and coaches.
 
@@ -78,11 +98,8 @@ export default async function handler(
   }
 
   // ---- 0. Verify the Firebase ID token ----
-  // Rejects with 401 (bad/missing token) or 500 (server not configured).
-  // No anonymous access permitted - this gate is what protects the OpenAI key.
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
-  console.log(`[transcribe] uid=${user.uid} email=${user.email ?? "(none)"}`);
 
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
@@ -92,13 +109,47 @@ export default async function handler(
     return;
   }
 
-  // ---- 1. Parse multipart upload ----
+  // ---- 1. Load quota context (also checks kill switch) ----
+  let ctx;
+  try {
+    ctx = await loadQuotaContext(user.uid);
+  } catch (err) {
+    if (err instanceof TranscriptionDisabledError) {
+      res.status(503).json({ error: err.message });
+      return;
+    }
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: `Could not load quota: ${message}` });
+    return;
+  }
+  console.log(
+    `[transcribe] uid=${user.uid} plan=${ctx.plan} used=${ctx.used.seconds}s/${ctx.used.count}rec ` +
+      `caps=${ctx.limits.maxMonthlySeconds}s/${ctx.limits.maxMonthlyRecordings}rec`
+  );
+
+  // Quick early bail-out: if the user has already hit the per-month recording
+  // count, we don't need to bother parsing the upload.
+  if (ctx.used.count >= ctx.limits.maxMonthlyRecordings) {
+    return respondQuotaExceeded(
+      res,
+      new QuotaExceededError(
+        `Monthly recording cap reached: ${ctx.used.count}/${ctx.limits.maxMonthlyRecordings} for ${ctx.plan} plan.`,
+        "monthly_recordings",
+        ctx.plan,
+        ctx.limits,
+        ctx.used
+      )
+    );
+  }
+
+  // ---- 2. Parse multipart upload (per-plan max bytes) ----
   let audioPath: string;
   let audioMime: string;
   let audioFilename: string;
+  let audioBytes: number;
   try {
     const form = formidable({
-      maxFileSize: MAX_AUDIO_BYTES,
+      maxFileSize: ctx.limits.maxFileBytes,
       keepExtensions: true,
     });
     const [, files] = await form.parse(req);
@@ -110,15 +161,66 @@ export default async function handler(
     audioPath = audio.filepath;
     audioMime = audio.mimetype ?? "audio/m4a";
     audioFilename = audio.originalFilename ?? "recording.m4a";
+    audioBytes = audio.size ?? 0;
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
+    // formidable throws when maxFileSize is exceeded -- treat as 413.
+    if (/maxFileSize/i.test(message)) {
+      res.status(413).json({
+        error: `Upload exceeds ${ctx.limits.maxFileBytes} byte limit for ${ctx.plan} plan.`,
+        reason: "file_too_large",
+        plan: ctx.plan,
+        limits: ctx.limits,
+        used: ctx.used,
+      });
+      return;
+    }
     res.status(400).json({ error: `Could not parse upload: ${message}` });
     return;
   }
 
+  // ---- 2b. Secondary size check (redundant safety net) ----
+  try {
+    assertFileSizeAllowed(audioBytes, ctx);
+  } catch (err) {
+    if (err instanceof QuotaExceededError) {
+      await fs.promises.unlink(audioPath).catch(() => undefined);
+      return respondQuotaExceeded(res, err);
+    }
+    throw err;
+  }
+
+  // ---- 3. Probe audio for real duration ----
+  let audioSeconds: number;
+  try {
+    const meta = await probeAudioFile(audioPath, audioMime);
+    audioSeconds = meta.seconds;
+    console.log(
+      `[transcribe] probed audio: ${audioSeconds}s, ${meta.codec ?? "?"}/${
+        meta.container ?? "?"
+      }, ${audioBytes} bytes`
+    );
+  } catch (err: unknown) {
+    await fs.promises.unlink(audioPath).catch(() => undefined);
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(400).json({ error: `Could not decode audio: ${message}` });
+    return;
+  }
+
+  // ---- 4. Quota check on the actual duration ----
+  try {
+    assertWithinMonthlyQuota(audioSeconds, ctx);
+  } catch (err) {
+    if (err instanceof QuotaExceededError) {
+      await fs.promises.unlink(audioPath).catch(() => undefined);
+      return respondQuotaExceeded(res, err);
+    }
+    throw err;
+  }
+
   const openai = new OpenAI({ apiKey });
 
-  // ---- 2. Whisper transcription ----
+  // ---- 5. Whisper transcription ----
   let transcript: string;
   try {
     const transcription = await openai.audio.transcriptions.create({
@@ -132,20 +234,24 @@ export default async function handler(
     res.status(500).json({ error: `Transcription failed: ${message}` });
     return;
   } finally {
-    // Best-effort cleanup of the tmp file formidable wrote.
     fs.promises.unlink(audioPath).catch(() => undefined);
   }
+
+  // We just spent money on OpenAI -- count it whether or not summarization works.
+  await recordUsage(user.uid, audioSeconds, ctx);
+  const usagePayload = buildUsagePayload(ctx, audioSeconds);
 
   if (transcript.length === 0) {
     res.status(200).json({
       transcript: "",
       summary: "(No speech detected.)",
       actionItems: [],
+      usage: usagePayload,
     });
     return;
   }
 
-  // ---- 3. gpt-4o-mini summarize + extract action items ----
+  // ---- 6. gpt-4o-mini summarize + extract action items ----
   let parsed: SummaryResponse;
   try {
     const completion = await openai.chat.completions.create({
@@ -171,13 +277,13 @@ export default async function handler(
     };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
-    // Still return the transcript so the user doesn't lose it.
     res.status(200).json({
       transcript,
       summary: "",
       actionItems: [],
       warning: `Summarization failed but transcript is available: ${message}`,
       audioFilename, // unused, kept to silence lint
+      usage: usagePayload,
     });
     return;
   }
@@ -186,5 +292,31 @@ export default async function handler(
     transcript,
     summary: parsed.summary,
     actionItems: parsed.actionItems,
+    usage: usagePayload,
   });
+}
+
+function respondQuotaExceeded(
+  res: VercelResponse,
+  err: QuotaExceededError
+): void {
+  res.status(429).json({
+    error: err.message,
+    reason: err.reason,
+    plan: err.plan,
+    limits: err.limits,
+    used: err.used,
+  });
+}
+
+function buildUsagePayload(ctx: QuotaContext, justUsedSeconds: number) {
+  return {
+    plan: ctx.plan,
+    monthKey: ctx.monthKey,
+    usedSeconds: ctx.used.seconds + Math.ceil(justUsedSeconds),
+    usedCount: ctx.used.count + 1,
+    limitSeconds: ctx.limits.maxMonthlySeconds,
+    limitCount: ctx.limits.maxMonthlyRecordings,
+    limitPerRecordingSeconds: ctx.limits.maxRecordingSeconds,
+  };
 }
