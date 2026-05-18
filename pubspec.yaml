@@ -1,0 +1,100 @@
+name: recapcoach
+description: "RecapCoach — record consulting calls and instantly get a clean transcript, summary, and action items powered by AI."
+publish_to: "none"
+version: 0.1.0+1
+
+environment:
+  sdk: ">=3.4.0 <4.0.0"
+  flutter: ">=3.24.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # State management
+  flutter_riverpod: ^2.5.1
+  riverpod_annotation: ^2.3.5
+
+  # Navigation
+  go_router: ^14.2.7
+
+  # Firebase
+  firebase_core: ^3.6.0
+  firebase_auth: ^5.3.1
+  cloud_firestore: ^5.4.4
+  firebase_analytics: ^11.3.3
+  firebase_crashlytics: ^4.1.3
+  firebase_remote_config: ^5.1.3
+  firebase_messaging: ^15.1.3
+
+  # Auth providers
+  google_sign_in: ^6.2.1
+
+  # In-app purchases (RevenueCat over Play Billing)
+  purchases_flutter: ^8.1.0
+
+  # Local storage
+  shared_preferences: ^2.3.2
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+
+  # Networking
+  dio: ^5.7.0
+
+  # UI helpers
+  flutter_svg: ^2.0.10+1
+  cached_network_image: ^3.4.1
+  smooth_page_indicator: ^1.2.0+3
+  url_launcher: ^6.3.1
+  package_info_plus: ^8.0.2
+  device_info_plus: ^10.1.2
+
+  # Logging
+  talker_flutter: ^4.4.1
+  talker_riverpod_logger: ^4.4.1
+
+  # Utilities
+  intl: ^0.19.0
+  collection: ^1.18.0
+  freezed_annotation: ^2.4.4
+  json_annotation: ^4.9.0
+
+  cupertino_icons: ^1.0.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+  # Code gen
+  build_runner: ^2.4.13
+  riverpod_generator: ^2.4.3
+  freezed: ^2.5.7
+  json_serializable: ^6.8.0
+  custom_lint: ^0.7.3
+  riverpod_lint: ^2.6.3
+
+  # Flavor/launcher icons / splash
+  flutter_launcher_icons: ^0.14.1
+  flutter_native_splash: ^2.4.1
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
+    - assets/icons/
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: false
+  image_path: "assets/icons/app_icon.png"
+  min_sdk_android: 23
+  adaptive_icon_background: "#0B0F19"
+  adaptive_icon_foreground: "assets/icons/app_icon_foreground.png"
+
+flutter_native_splash:
+  color: "#0B0F19"
+  image: assets/icons/splash.png
+  android_12:
+    color: "#0B0F19"
+    image: assets/icons/splash.png
