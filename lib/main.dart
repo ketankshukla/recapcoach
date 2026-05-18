@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/foundation.dart';
@@ -11,6 +12,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'app.dart';
 import 'core/analytics/analytics.dart';
 import 'core/logging/logger.dart';
+import 'features/notes/note_cloud_repository.dart';
 import 'features/notes/note_providers.dart';
 import 'features/notes/note_repository.dart';
 import 'features/paywall/purchases_service.dart';
@@ -35,12 +37,19 @@ Future<void> main() async {
 
     await Hive.initFlutter();
     final prefs = await SharedPreferences.getInstance();
-    final noteRepo = await NoteRepository.open();
+    final noteCloudRepo = NoteCloudRepository();
+    final noteRepo = await NoteRepository.open(
+      cloud: noteCloudRepo,
+      uidGetter: () => FirebaseAuth.instance.currentUser?.uid,
+    );
 
-    final container = ProviderContainer(overrides: [
-      sharedPrefsProvider.overrideWithValue(prefs),
-      noteRepositoryProvider.overrideWithValue(noteRepo),
-    ]);
+    final container = ProviderContainer(
+      overrides: [
+        sharedPrefsProvider.overrideWithValue(prefs),
+        noteRepositoryProvider.overrideWithValue(noteRepo),
+        noteCloudRepositoryProvider.overrideWithValue(noteCloudRepo),
+      ],
+    );
 
     await container.read(remoteConfigProvider).initialize();
     await container.read(purchasesServiceProvider).configure();

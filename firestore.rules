@@ -1,0 +1,25 @@
+rules_version = '2';
+
+// RecapCoach Firestore security rules.
+//
+// Data model:
+//   /users/{uid}/notes/{noteId}   <- private notes for one user
+//
+// Each user can only read/write documents under their own /users/{uid} path.
+// All other reads and writes are denied by default.
+//
+// Deploy with:
+//   firebase deploy --only firestore:rules
+//
+// Or paste into:
+//   Firebase Console -> Firestore Database -> Rules.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /users/{uid}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // Anything else is locked down by default. (No global match, no public access.)
+  }
+}
