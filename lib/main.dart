@@ -11,6 +11,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'app.dart';
 import 'core/analytics/analytics.dart';
 import 'core/logging/logger.dart';
+import 'features/notes/note_providers.dart';
+import 'features/notes/note_repository.dart';
 import 'features/paywall/purchases_service.dart';
 import 'firebase_options.dart';
 import 'shared/providers/shared_prefs_provider.dart';
@@ -33,9 +35,11 @@ Future<void> main() async {
 
     await Hive.initFlutter();
     final prefs = await SharedPreferences.getInstance();
+    final noteRepo = await NoteRepository.open();
 
     final container = ProviderContainer(overrides: [
       sharedPrefsProvider.overrideWithValue(prefs),
+      noteRepositoryProvider.overrideWithValue(noteRepo),
     ]);
 
     await container.read(remoteConfigProvider).initialize();

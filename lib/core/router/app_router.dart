@@ -6,9 +6,11 @@ import '../../features/auth/auth_providers.dart';
 import '../../features/auth/sign_in_screen.dart';
 import '../../features/home/home_screen.dart';
 import '../../features/legal/legal_viewer_screen.dart';
+import '../../features/notes/note_detail_screen.dart';
 import '../../features/onboarding/onboarding_provider.dart';
 import '../../features/onboarding/onboarding_screen.dart';
 import '../../features/paywall/paywall_screen.dart';
+import '../../features/recording/record_screen.dart';
 import '../../features/settings/settings_screen.dart';
 
 class AppRoutes {
@@ -19,6 +21,8 @@ class AppRoutes {
   static const String paywall = '/paywall';
   static const String settings = '/settings';
   static const String legal = '/legal';
+  static const String record = '/record';
+  static const String notes = '/notes';
 }
 
 final goRouterProvider = Provider<GoRouter>((ref) {
@@ -72,6 +76,15 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '${AppRoutes.legal}/:doc',
         builder: (_, state) => LegalViewerScreen(doc: state.pathParameters['doc']!),
+      ),
+      GoRoute(
+        path: AppRoutes.record,
+        builder: (_, __) => const RecordScreen(),
+      ),
+      GoRoute(
+        path: '${AppRoutes.notes}/:id',
+        builder: (_, state) =>
+            NoteDetailScreen(noteId: state.pathParameters['id']!),
       ),
     ],
     errorBuilder: (_, state) => Scaffold(
