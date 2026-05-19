@@ -1,33 +1,32 @@
-// Tests for the `WeeklyStatsCard` -- the new hero card that replaces
-// the old AppBar + Account card + horizontal usage meter combo.
+// Tests for the `WeeklyStatsCard` -- the hero card on the home screen.
+//
+// IMPORTANT: despite the name, this card now shows MONTHLY usage from
+// the server-backed `UsageSnapshot`, not weekly counts from local
+// Hive. The rename was deferred to avoid an even larger diff in the
+// commit that introduced the redesign. Earlier iterations showed
+// "19 recordings this week" alongside "5/5 cap reached this month",
+// which was confusing -- the numbers on the card now tie directly to
+// the same caps the server-side `quota.ts` enforces.
 //
 // Two layers under test:
 //
-//   1. Pure-logic helpers: `firstName()` and `weeklyStats()`. These
-//      are exposed as static methods so we can hammer them without a
-//      widget pump.
+//   1. Pure-logic helper: `firstName()`. Static so we can hammer it
+//      without a widget pump.
 //   2. Widget rendering: greeting branches (signed-in vs anonymous),
-//      stats labels (singular vs plural), settings callback wiring.
+//      monthly stat values + labels, arc-center copy across plan +
+//      cap states, developer bypass rendering, and settings callback
+//      wiring.
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:recapcoach/core/theme/app_theme.dart';
 import 'package:recapcoach/features/home/widgets/weekly_stats_card.dart';
-import 'package:recapcoach/features/notes/note.dart';
 import 'package:recapcoach/features/usage/usage.dart';
-
-Note _note({required DateTime createdAt, int durationMs = 60000}) {
-  return Note(
-    id: 'n-${createdAt.microsecondsSinceEpoch}',
-    audioFilePath: '/tmp/x.aac',
-    createdAt: createdAt,
-    durationMs: durationMs,
-  );
-}
 
 UsageSnapshot _usage({
   String plan = 'free',
   int usedSeconds = 0,
   int usedRecordings = 0,
+  bool isDeveloper = false,
 }) {
   final isPro = plan == 'pro';
   return UsageSnapshot(
@@ -44,6 +43,7 @@ UsageSnapshot _usage({
     limitPerRecordingSeconds: isPro
         ? UsageSnapshot.proLimitPerRecordingSeconds
         : UsageSnapshot.freeLimitPerRecordingSeconds,
+    isDeveloper: isDeveloper,
   );
 }
 
@@ -53,7 +53,6 @@ Future<void> _pump(
   String? email,
   String? photoUrl,
   required DateTime now,
-  required List<Note> notes,
   UsageSnapshot? usage,
   VoidCallback? onSettings,
 }) async {
@@ -66,7 +65,6 @@ Future<void> _pump(
           email: email,
           photoUrl: photoUrl,
           onSettings: onSettings ?? () {},
-          notes: notes,
           usage: usage,
           now: now,
         ),
@@ -94,57 +92,6 @@ void main() {
     });
   });
 
-  group('WeeklyStatsCard.weeklyStats (static)', () {
-    final now = DateTime.utc(2026, 5, 18, 12);
-
-    test('Counts only notes created in the last 7 days', () {
-      final notes = [
-        _note(createdAt: now.subtract(const Duration(days: 1))),
-        _note(createdAt: now.subtract(const Duration(days: 6))),
-        _note(createdAt: now.subtract(const Duration(days: 8))), // out
-        _note(createdAt: now.subtract(const Duration(days: 30))), // out
-      ];
-      final stats = WeeklyStatsCard.weeklyStats(notes, now);
-      expect(stats.count, 2);
-    });
-
-    test('Sums durations only for in-window notes, in whole minutes', () {
-      final notes = [
-        _note(
-          createdAt: now.subtract(const Duration(days: 1)),
-          durationMs: 120000, // 2 min
-        ),
-        _note(
-          createdAt: now.subtract(const Duration(days: 3)),
-          durationMs: 180000, // 3 min
-        ),
-        _note(
-          createdAt: now.subtract(const Duration(days: 9)),
-          durationMs: 600000, // 10 min, OUT of window
-        ),
-      ];
-      final stats = WeeklyStatsCard.weeklyStats(notes, now);
-      expect(stats.count, 2);
-      expect(stats.minutes, 5);
-    });
-
-    test('Empty list returns zeros', () {
-      final stats = WeeklyStatsCard.weeklyStats([], now);
-      expect(stats.count, 0);
-      expect(stats.minutes, 0);
-    });
-
-    test('Boundary: a note exactly 7 days ago is OUT of the window', () {
-      // The cutoff uses `>` (isAfter), which matches the user's
-      // expectation that "this week" means strictly less than 7 days.
-      final notes = [
-        _note(createdAt: now.subtract(const Duration(days: 7))),
-      ];
-      final stats = WeeklyStatsCard.weeklyStats(notes, now);
-      expect(stats.count, 0);
-    });
-  });
-
   group('WeeklyStatsCard widget', () {
     final now = DateTime(2026, 5, 18, 9); // 9 a.m. -> Good morning
 
@@ -154,7 +101,7 @@ void main() {
         displayName: 'Ketan Shukla',
         email: 'k@e.com',
         now: now,
-        notes: [],
+        usage: _usage(),
       );
       expect(find.text('Good morning,'), findsOneWidget);
       expect(find.text('Ketan'), findsOneWidget);
@@ -162,66 +109,52 @@ void main() {
 
     testWidgets('Anonymous user falls back to "Welcome to / RecapCoach"',
         (tester) async {
-      await _pump(tester, now: now, notes: []);
+      await _pump(tester, now: now, usage: _usage());
       expect(find.text('Welcome to'), findsOneWidget);
       expect(find.text('RecapCoach'), findsOneWidget);
       expect(find.text('Good morning,'), findsNothing);
     });
 
-    testWidgets('Stats row shows weekly recording count + minutes',
+    testWidgets(
+        'Free user stats row shows monthly recordings/cap and minutes/cap',
         (tester) async {
-      final notes = [
-        _note(
-          createdAt: now.subtract(const Duration(days: 1)),
-          durationMs: 240000, // 4 min
-        ),
-        _note(
-          createdAt: now.subtract(const Duration(days: 2)),
-          durationMs: 180000, // 3 min
-        ),
-      ];
+      // 2 recordings, 4 minutes (240 seconds) used on the free plan.
+      // Free caps come from UsageSnapshot.freeLimitRecordings (5) and
+      // freeLimitSeconds (900s = 15 min).
       await _pump(
         tester,
         displayName: 'Ketan',
         email: 'k@e.com',
         now: now,
-        notes: notes,
+        usage: _usage(usedRecordings: 2, usedSeconds: 240),
       );
-      // 2 recordings, 7 minutes total
-      expect(find.text('2'), findsOneWidget);
-      expect(find.text('7'), findsOneWidget);
-      expect(find.text('recordings\nthis week'), findsOneWidget);
-      expect(find.text('minutes\ncaptured'), findsOneWidget);
-    });
 
-    testWidgets('Single-recording label uses the singular form',
-        (tester) async {
-      final notes = [
-        _note(
-          createdAt: now.subtract(const Duration(days: 1)),
-          durationMs: 60000, // 1 min
-        ),
-      ];
-      await _pump(
-        tester,
-        displayName: 'Ketan',
-        email: 'k@e.com',
-        now: now,
-        notes: notes,
+      // Big stat values render as "used/cap".
+      expect(
+        find.text('2/${UsageSnapshot.freeLimitRecordings}'),
+        findsOneWidget,
+        reason: 'Recordings stat should be "2/5" on free plan',
       );
-      expect(find.text('recording\nthis week'), findsOneWidget);
-      expect(find.text('minute\ncaptured'), findsOneWidget);
+      expect(
+        find.text('4/${UsageSnapshot.freeLimitSeconds ~/ 60}'),
+        findsOneWidget,
+        reason: 'Minutes stat should be "4/15" on free plan',
+      );
+
+      // Stat sub-labels say "this month", not "this week", so the card
+      // is unambiguous about which window it covers.
+      expect(find.text('recordings\nthis month'), findsOneWidget);
+      expect(find.text('minutes\nthis month'), findsOneWidget);
     });
 
     testWidgets('Free user under cap: arc center shows "X% used"',
         (tester) async {
-      // 50% of free seconds cap (15 min) used.
+      // 50% of free seconds cap used.
       await _pump(
         tester,
         displayName: 'Ketan',
         email: 'k@e.com',
         now: now,
-        notes: [],
         usage: _usage(
           usedSeconds: UsageSnapshot.freeLimitSeconds ~/ 2,
           usedRecordings: 0,
@@ -231,28 +164,25 @@ void main() {
       expect(find.text('used'), findsOneWidget);
     });
 
-    testWidgets('Pro user: arc center shows PRO / plan',
-        (tester) async {
+    testWidgets('Pro user: arc center shows PRO / plan', (tester) async {
       await _pump(
         tester,
         displayName: 'Ketan',
         email: 'k@e.com',
         now: now,
-        notes: [],
         usage: _usage(plan: 'pro', usedSeconds: 100, usedRecordings: 1),
       );
       expect(find.text('PRO'), findsOneWidget);
       expect(find.text('plan'), findsOneWidget);
     });
 
-    testWidgets('At-cap user: arc center shows CAP / reached',
+    testWidgets('At-cap free user: arc center shows CAP / reached',
         (tester) async {
       await _pump(
         tester,
         displayName: 'Ketan',
         email: 'k@e.com',
         now: now,
-        notes: [],
         usage: _usage(
           usedSeconds: UsageSnapshot.freeLimitSeconds,
           usedRecordings: UsageSnapshot.freeLimitRecordings,
@@ -260,6 +190,58 @@ void main() {
       );
       expect(find.text('CAP'), findsOneWidget);
       expect(find.text('reached'), findsOneWidget);
+    });
+
+    testWidgets(
+        'Developer bypass: arc shows DEV / unlimited and labels drop "/cap"',
+        (tester) async {
+      // Developer flag short-circuits caps server-side; the card has
+      // to mirror that or the user sees "5/5 cap reached" while the
+      // server happily accepts more recordings.
+      await _pump(
+        tester,
+        displayName: 'Ketan',
+        email: 'k@e.com',
+        now: now,
+        usage: _usage(
+          usedRecordings: 19,
+          usedSeconds: 4 * 60,
+          isDeveloper: true,
+        ),
+      );
+
+      // Arc center.
+      expect(find.text('DEV'), findsOneWidget);
+      expect(find.text('unlimited'), findsAtLeastNWidgets(1));
+
+      // Stat values: counts only, NO "/cap" suffix.
+      expect(find.text('19'), findsOneWidget);
+      expect(find.text('4'), findsOneWidget);
+      expect(find.text('19/5'), findsNothing);
+
+      // Stat labels: plural forms with "unlimited" sub-label, not
+      // "this month / cap".
+      expect(find.text('recordings\nunlimited'), findsOneWidget);
+      expect(find.text('minutes\nunlimited'), findsOneWidget);
+      expect(find.text('recordings\nthis month'), findsNothing);
+    });
+
+    testWidgets(
+        'Developer bypass with single recording uses singular labels',
+        (tester) async {
+      await _pump(
+        tester,
+        displayName: 'Ketan',
+        email: 'k@e.com',
+        now: now,
+        usage: _usage(
+          usedRecordings: 1,
+          usedSeconds: 60, // 1 minute exactly
+          isDeveloper: true,
+        ),
+      );
+      expect(find.text('recording\nunlimited'), findsOneWidget);
+      expect(find.text('minute\nunlimited'), findsOneWidget);
     });
 
     testWidgets('Settings icon button fires onSettings callback',
@@ -270,7 +252,7 @@ void main() {
         displayName: 'Ketan',
         email: 'k@e.com',
         now: now,
-        notes: [],
+        usage: _usage(),
         onSettings: () => taps++,
       );
       await tester.tap(find.byIcon(Icons.settings_outlined));

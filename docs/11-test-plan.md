@@ -57,22 +57,36 @@ this is the layer most likely to leak money if it breaks. Anything marked
 Test the pure-Dart math in `UsageSnapshot`. No Flutter, no Firebase, just
 calculations.
 
-| #       | Test                                                                                  | Expected                                                |
-| ------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------- |
-| U1.1.1  | **[CRITICAL]** Free plan defaults match server-side `api/_lib/limits.ts`              | 15 min, 5 recordings, 3 min/recording                   |
-| U1.1.2  | **[CRITICAL]** Pro plan defaults match server-side `api/_lib/limits.ts`               | 8 hr (28,800 s), 100 recordings, 20 min/recording       |
-| U1.1.3  | Empty snapshot has 0 used, 0% progress, not at cap                                    | usedSeconds = 0, secondsProgress = 0.0, isAtCap = false |
-| U1.1.4  | Snapshot at 50% returns 0.5 progress                                                  | secondsProgress = 0.5                                   |
-| U1.1.5  | Snapshot at 100% returns 1.0 progress and isAtCap = true                              | secondsProgress = 1.0, isAtCap = true                   |
-| U1.1.6  | Snapshot above 100% (defensive) clamps to 1.0                                         | secondsProgress = 1.0                                   |
-| U1.1.7  | `worstProgress` returns the higher of the two meters                                  | max(secondsProgress, recordingsProgress)                |
-| U1.1.8  | **[CRITICAL]** `isAtCap = true` when recordings count >= limit, even if minutes are 0 | (you used 5/5 recordings of 0 min each → still capped)  |
-| U1.1.9  | **[CRITICAL]** `isAtCap = true` when seconds >= limit, even if recordings are 0       | (1 recording of 16 min on free → still capped)          |
-| U1.1.10 | `remainingMinutesLabel` formats < 1 min as seconds                                    | "30s"                                                   |
-| U1.1.11 | `remainingMinutesLabel` formats minutes correctly                                     | "7m 30s", "5m"                                          |
-| U1.1.12 | `remainingMinutesLabel` formats hours correctly                                       | "1h 15m", "8h"                                          |
-| U1.1.13 | `currentUtcMonthKey()` produces YYYY-MM in UTC                                        | "2026-05" regardless of local timezone                  |
-| U1.1.14 | `currentUtcMonthKey()` rolls over at UTC midnight, not local midnight                 | Tested with a date forced to 11pm local / 2am UTC       |
+| #       | Test                                                                                  | Expected                                                       |
+| ------- | ------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| U1.1.1  | **[CRITICAL]** Free plan defaults match server-side `api/_lib/limits.ts`              | 15 min, 5 recordings, 3 min/recording                          |
+| U1.1.2  | **[CRITICAL]** Pro plan defaults match server-side `api/_lib/limits.ts`               | 8 hr (28,800 s), 100 recordings, 20 min/recording              |
+| U1.1.3  | Empty snapshot has 0 used, 0% progress, not at cap                                    | usedSeconds = 0, secondsProgress = 0.0, isAtCap = false        |
+| U1.1.4  | Snapshot at 50% returns 0.5 progress                                                  | secondsProgress = 0.5                                          |
+| U1.1.5  | Snapshot at 100% returns 1.0 progress and isAtCap = true                              | secondsProgress = 1.0, isAtCap = true                          |
+| U1.1.6  | Snapshot above 100% (defensive) clamps to 1.0                                         | secondsProgress = 1.0                                          |
+| U1.1.7  | `worstProgress` returns the higher of the two meters                                  | max(secondsProgress, recordingsProgress)                       |
+| U1.1.8  | **[CRITICAL]** `isAtCap = true` when recordings count >= limit, even if minutes are 0 | (you used 5/5 recordings of 0 min each → still capped)         |
+| U1.1.9  | **[CRITICAL]** `isAtCap = true` when seconds >= limit, even if recordings are 0       | (1 recording of 16 min on free → still capped)                 |
+| U1.1.10 | `remainingMinutesLabel` formats < 1 min as seconds                                    | "30s"                                                          |
+| U1.1.11 | `remainingMinutesLabel` formats minutes correctly                                     | "7m 30s", "5m"                                                 |
+| U1.1.12 | `remainingMinutesLabel` formats hours correctly                                       | "1h 15m", "8h"                                                 |
+| U1.1.13 | `currentUtcMonthKey()` produces YYYY-MM in UTC                                        | "2026-05" regardless of local timezone                         |
+| U1.1.14 | `currentUtcMonthKey()` rolls over at UTC midnight, not local midnight                 | Tested with a date forced to 11pm local / 2am UTC              |
+| U1.1.15 | `isDeveloper` defaults to `false` on regular snapshots                                | New `UsageSnapshot(...)` without flag => `isDeveloper = false` |
+| U1.1.16 | **[CRITICAL]** Developer bypass: `isAtCap == false` even with both caps exceeded      | 99 recordings / 9999 s on free => `isAtCap = false`            |
+| U1.1.17 | Developer bypass: `secondsProgress`, `recordingsProgress`, `worstProgress` all = 0    | Hero arc renders empty / DEV ring                              |
+| U1.1.18 | Developer bypass: `UsageSnapshot.empty()` propagates `isDeveloper`                    | `empty(isDeveloper: true).isAtCap == false`                    |
+| U1.1.19 | Developer bypass: `UsageSnapshot.fromFirestore()` propagates `isDeveloper`            | Real Firestore payload + flag => bypass holds                  |
+| U1.1.20 | Developer bypass intentionally does NOT alter `remaining*` getters                    | Documents the dead-code-path decision (see chapter 09)         |
+| U1.1.21 | `GlobalConfigSnapshot.empty` defaults: transcription enabled, no developers           | `transcriptionEnabled = true`, `developerUids = []`            |
+| U1.1.22 | `GlobalConfigSnapshot.fromFirestore(null)` returns the empty default                  | Same as `.empty`                                               |
+| U1.1.23 | Parses `transcriptionEnabled = false` explicitly                                      | Kill-switch state mirrored                                     |
+| U1.1.24 | Defensive: non-bool `transcriptionEnabled` defaults to `true`                         | Misconfigured field doesn't kill transcription                 |
+| U1.1.25 | Parses `developerUids` as a list of strings                                           | `['uid-a', 'uid-b']` => same                                   |
+| U1.1.26 | Drops empty strings, nulls, and non-strings from `developerUids`                      | Mixed list filtered to valid UIDs only                         |
+| U1.1.27 | Non-iterable `developerUids` (e.g. raw string) falls back to empty list               | No accidental char-splitting / coercion                        |
+| U1.1.28 | **[CRITICAL]** Absent `developerUids` => empty list (no accidental dev mode)          | Missing field never grants bypass                              |
 
 ### 1.2 Quota enforcement (backend, `api/__tests__/quota.test.ts`)
 

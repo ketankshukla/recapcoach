@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_semantic_colors.dart';
 import '../../../core/theme/app_spacing.dart';
-import '../../notes/note.dart';
 import '../../usage/usage.dart';
 import 'arc_usage_ring.dart';
 import 'glass_card.dart';
@@ -18,16 +17,25 @@ import 'user_avatar.dart';
 ///  1. Hosts the avatar + settings icon (top row).
 ///  2. Renders the time-based greeting in display-size typography
 ///     (32-36 pt bold).
-///  3. Shows three at-a-glance stats: this-week recordings count,
-///     this-week minutes captured, and a circular usage arc with the
-///     percent used in the center.
+///  3. Shows three at-a-glance stats: this-MONTH recordings, this-month
+///     minutes used, and a circular usage arc with the percent used
+///     in the center. All three come from the server-backed
+///     `UsageSnapshot` so they tie directly to the quota that the
+///     "plan cap reached" dialog enforces -- earlier iterations
+///     showed weekly counts from local Hive, which led to confusing
+///     screens like "19 recordings this week" alongside "5/5 cap
+///     reached this month."
+///
+/// Developer accounts (`usage.isDeveloper == true`) get a special
+/// rendering: caps disappear, the arc shows "DEV / unlimited" instead
+/// of a percent, and the stat labels drop the "/cap" suffix.
 ///
 /// Designed to be the visual focal point of the screen. Built on top
 /// of [GlassCard] so it sits over the mesh-gradient background with a
 /// frosted-glass feel.
 ///
 /// `now` is overridable for tests so we can deterministically
-/// exercise greeting + weekly-window math without time-of-day flakiness.
+/// exercise greeting branches without time-of-day flakiness.
 class WeeklyStatsCard extends StatelessWidget {
   const WeeklyStatsCard({
     super.key,
@@ -35,7 +43,6 @@ class WeeklyStatsCard extends StatelessWidget {
     required this.email,
     required this.photoUrl,
     required this.onSettings,
-    required this.notes,
     required this.usage,
     this.now,
   });
@@ -44,7 +51,6 @@ class WeeklyStatsCard extends StatelessWidget {
   final String? email;
   final String? photoUrl;
   final VoidCallback onSettings;
-  final List<Note> notes;
   final UsageSnapshot? usage;
   final DateTime? now;
 
@@ -55,25 +61,6 @@ class WeeklyStatsCard extends StatelessWidget {
     final trimmed = name.trim();
     if (trimmed.isEmpty) return null;
     return trimmed.split(RegExp(r'\s+')).first;
-  }
-
-  /// Sums durations of notes created in the last 7 days. Exposed
-  /// statically so tests can verify the windowing logic without a
-  /// widget pump.
-  static ({int count, int minutes}) weeklyStats(
-    List<Note> notes,
-    DateTime now,
-  ) {
-    final cutoff = now.subtract(const Duration(days: 7));
-    var count = 0;
-    var ms = 0;
-    for (final n in notes) {
-      if (n.createdAt.isAfter(cutoff)) {
-        count++;
-        ms += n.durationMs;
-      }
-    }
-    return (count: count, minutes: (ms / 60000).round());
   }
 
   @override
@@ -87,11 +74,55 @@ class WeeklyStatsCard extends StatelessWidget {
     final fname = firstName(displayName);
     final hasName = fname != null;
 
-    final stats = weeklyStats(notes, t);
     final progress = (usage?.worstProgress ?? 0).clamp(0.0, 1.0);
     final isPro = usage?.plan == 'pro';
+    final isDeveloper = usage?.isDeveloper ?? false;
     final atCap = usage?.isAtCap ?? false;
-    final ringColor = semantic.usageMeterColorFor(progress);
+    final ringColor = isDeveloper
+        ? AppColors.amber400
+        : semantic.usageMeterColorFor(progress);
+
+    // Monthly usage from the server-backed UsageSnapshot. These tie
+    // directly to the caps in the "plan limit reached" dialog so the
+    // numbers on screen are the same numbers the server enforces.
+    final usedRecordings = usage?.usedRecordings ?? 0;
+    final limitRecordings = usage?.limitRecordings ?? 0;
+    final usedMinutes = ((usage?.usedSeconds ?? 0) / 60).round();
+    final limitMinutes = ((usage?.limitSeconds ?? 0) / 60).round();
+
+    // Stat row labels adapt to dev vs free vs pro.
+    //
+    //  - Developer: just the count, no "/cap" suffix, "unlimited"
+    //    sub-label.
+    //  - Free / Pro: "used / cap" big text, "recordings\nthis month"
+    //    sub-label so it's obvious what the cap context is.
+    final recordingsValue =
+        isDeveloper ? '$usedRecordings' : '$usedRecordings/$limitRecordings';
+    final minutesValue =
+        isDeveloper ? '$usedMinutes' : '$usedMinutes/$limitMinutes';
+    final recordingsLabel = isDeveloper
+        ? (usedRecordings == 1 ? 'recording\nunlimited' : 'recordings\nunlimited')
+        : 'recordings\nthis month';
+    final minutesLabel = isDeveloper
+        ? (usedMinutes == 1 ? 'minute\nunlimited' : 'minutes\nunlimited')
+        : 'minutes\nthis month';
+
+    // Arc center: percent / PRO / CAP / DEV depending on plan + state.
+    final String arcHead;
+    final String arcSub;
+    if (isDeveloper) {
+      arcHead = 'DEV';
+      arcSub = 'unlimited';
+    } else if (atCap) {
+      arcHead = 'CAP';
+      arcSub = 'reached';
+    } else if (isPro) {
+      arcHead = 'PRO';
+      arcSub = 'plan';
+    } else {
+      arcHead = '${(progress * 100).round()}%';
+      arcSub = 'used';
+    }
 
     // Foreground text color tuned for the glass surface in each mode.
     // Dark mode: nearly-white off-white. Light mode: deep navy ink.
@@ -193,10 +224,8 @@ class WeeklyStatsCard extends StatelessWidget {
             children: [
               Expanded(
                 child: _Stat(
-                  value: '${stats.count}',
-                  label: stats.count == 1
-                      ? 'recording\nthis week'
-                      : 'recordings\nthis week',
+                  value: recordingsValue,
+                  label: recordingsLabel,
                   fg: fg,
                   fgMuted: fgMuted,
                 ),
@@ -204,10 +233,8 @@ class WeeklyStatsCard extends StatelessWidget {
               _Divider(isDark: isDark),
               Expanded(
                 child: _Stat(
-                  value: '${stats.minutes}',
-                  label: stats.minutes == 1
-                      ? 'minute\ncaptured'
-                      : 'minutes\ncaptured',
+                  value: minutesValue,
+                  label: minutesLabel,
                   fg: fg,
                   fgMuted: fgMuted,
                 ),
@@ -217,7 +244,10 @@ class WeeklyStatsCard extends StatelessWidget {
                 width: 96,
                 child: Center(
                   child: ArcUsageRing(
-                    progress: progress,
+                    // Developers see a full amber ring as a visual
+                    // "you've got everything" signal rather than an
+                    // empty meter.
+                    progress: isDeveloper ? 1.0 : progress,
                     color: ringColor,
                     trackColor: isDark
                         ? Colors.white.withValues(alpha: 0.10)
@@ -228,11 +258,7 @@ class WeeklyStatsCard extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          atCap
-                              ? 'CAP'
-                              : isPro
-                                  ? 'PRO'
-                                  : '${(progress * 100).round()}%',
+                          arcHead,
                           style: theme.textTheme.titleSmall?.copyWith(
                             color: fg,
                             fontWeight: FontWeight.w700,
@@ -243,11 +269,7 @@ class WeeklyStatsCard extends StatelessWidget {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          atCap
-                              ? 'reached'
-                              : isPro
-                                  ? 'plan'
-                                  : 'used',
+                          arcSub,
                           style: theme.textTheme.labelSmall?.copyWith(
                             color: fgMuted,
                             fontSize: 10,

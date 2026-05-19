@@ -42,6 +42,14 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
     // ---- Pre-flight quota check (client-side, advisory) ----
     // The server is the source of truth and will reject 429 if the user is
     // over quota, but bouncing them BEFORE they record saves a wasted recording.
+    //
+    // Dev accounts get isAtCap=false from `UsageSnapshot` so they
+    // never see this dialog (debug builds OR uid in
+    // `/config/global.developerUids`). The `plan != 'pro'` check is
+    // intentional: this dialog's copy is Free-tier specific
+    // ("Upgrade to Pro..."), so we don't want to show it to a Pro
+    // user who hit their 100/8h ceiling -- they'll get a clearer
+    // server 429 with a Pro-aware message.
     final usage = ref.read(monthlyUsageProvider).value;
     if (usage != null && usage.isAtCap && usage.plan != 'pro') {
       await _showQuotaDialog(usage);

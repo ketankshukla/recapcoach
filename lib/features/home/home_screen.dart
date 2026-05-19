@@ -119,6 +119,9 @@ class _HomeBody extends StatelessWidget {
   })  : notes = const [],
         _isSkeleton = true;
 
+  /// All notes in the Hive box. Used to render the recent-recordings
+  /// list + the empty state. *Not* used for hero stats anymore --
+  /// those come from `usage` so they match the server-enforced caps.
   final List<Note> notes;
   final UsageSnapshot? usage;
   final String? displayName;
@@ -135,7 +138,6 @@ class _HomeBody extends StatelessWidget {
         email: email,
         photoUrl: photoUrl,
         onSettings: onSettings,
-        notes: notes,
         usage: usage,
       ),
       const SizedBox(height: AppSpacing.lg),

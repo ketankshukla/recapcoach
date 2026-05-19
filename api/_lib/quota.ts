@@ -21,7 +21,7 @@
  * the counters.  See firestore.rules.
  */
 
-import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import {
   FREE_LIMITS,
   PRO_LIMITS,
@@ -29,30 +29,30 @@ import {
   type PlanLimits,
   currentMonthKey,
   limitsFor,
-} from './limits';
+} from "./limits";
 
 export class QuotaExceededError extends Error {
   constructor(
     message: string,
     public readonly reason:
-      | 'kill_switch'
-      | 'recording_too_long'
-      | 'file_too_large'
-      | 'monthly_minutes'
-      | 'monthly_recordings',
+      | "kill_switch"
+      | "recording_too_long"
+      | "file_too_large"
+      | "monthly_minutes"
+      | "monthly_recordings",
     public readonly plan: Plan,
     public readonly limits: PlanLimits,
-    public readonly used: { seconds: number; count: number },
+    public readonly used: { seconds: number; count: number }
   ) {
     super(message);
-    this.name = 'QuotaExceededError';
+    this.name = "QuotaExceededError";
   }
 }
 
 export class TranscriptionDisabledError extends Error {
-  constructor(message = 'Transcription is temporarily disabled.') {
+  constructor(message = "Transcription is temporarily disabled.") {
     super(message);
-    this.name = 'TranscriptionDisabledError';
+    this.name = "TranscriptionDisabledError";
   }
 }
 
@@ -60,42 +60,48 @@ interface GlobalConfig {
   transcriptionEnabled: boolean;
   freeOverride: Partial<PlanLimits> | null;
   proOverride: Partial<PlanLimits> | null;
+  developerUids: string[];
 }
 
 const DEFAULT_GLOBAL: GlobalConfig = {
   transcriptionEnabled: true,
   freeOverride: null,
   proOverride: null,
+  developerUids: [],
 };
 
 /** Read /config/global with safe defaults if the doc is missing. */
 async function readGlobalConfig(): Promise<GlobalConfig> {
-  const snap = await getFirestore().doc('config/global').get();
+  const snap = await getFirestore().doc("config/global").get();
   if (!snap.exists) return DEFAULT_GLOBAL;
   const data = snap.data() ?? {};
+  const rawDevs = data.developerUids;
+  const developerUids = Array.isArray(rawDevs)
+    ? rawDevs.filter((u: unknown): u is string => typeof u === "string")
+    : [];
   return {
     transcriptionEnabled: data.transcriptionEnabled !== false, // default true
-    freeOverride: (data.freeOverride as Partial<PlanLimits> | undefined) ?? null,
+    freeOverride:
+      (data.freeOverride as Partial<PlanLimits> | undefined) ?? null,
     proOverride: (data.proOverride as Partial<PlanLimits> | undefined) ?? null,
+    developerUids,
   };
 }
 
 /** Look up the user's plan (defaults to 'free' if no /users/{uid} doc). */
 async function readUserPlan(uid: string): Promise<Plan> {
   const snap = await getFirestore().doc(`users/${uid}`).get();
-  if (!snap.exists) return 'free';
+  if (!snap.exists) return "free";
   const plan = snap.data()?.plan;
-  return plan === 'pro' ? 'pro' : 'free';
+  return plan === "pro" ? "pro" : "free";
 }
 
 /** Read this month's usage counters for the user. */
 async function readMonthlyUsage(
   uid: string,
-  monthKey: string,
+  monthKey: string
 ): Promise<{ seconds: number; count: number }> {
-  const snap = await getFirestore()
-    .doc(`users/${uid}/usage/${monthKey}`)
-    .get();
+  const snap = await getFirestore().doc(`users/${uid}/usage/${monthKey}`).get();
   if (!snap.exists) return { seconds: 0, count: 0 };
   const d = snap.data() ?? {};
   return {
@@ -109,6 +115,14 @@ export interface QuotaContext {
   limits: PlanLimits;
   used: { seconds: number; count: number };
   monthKey: string;
+  /**
+   * `true` when the caller's UID is listed in `/config/global.developerUids`.
+   * Developers bypass every quota check (file size, per-recording, monthly
+   * minutes, monthly recordings) but their usage is still recorded so we can
+   * monitor what they're using. Set the array in Firestore via the Firebase
+   * Console -- it's admin-only writable per `firestore.rules`.
+   */
+  isDeveloper: boolean;
 }
 
 /**
@@ -116,37 +130,44 @@ export interface QuotaContext {
  * Throws TranscriptionDisabledError if the global kill switch is flipped.
  */
 export async function loadQuotaContext(uid: string): Promise<QuotaContext> {
-  const [cfg, plan] = await Promise.all([readGlobalConfig(), readUserPlan(uid)]);
+  const [cfg, plan] = await Promise.all([
+    readGlobalConfig(),
+    readUserPlan(uid),
+  ]);
   if (!cfg.transcriptionEnabled) {
     throw new TranscriptionDisabledError();
   }
   const base = limitsFor(plan);
-  const override = plan === 'pro' ? cfg.proOverride : cfg.freeOverride;
+  const override = plan === "pro" ? cfg.proOverride : cfg.freeOverride;
   const limits: PlanLimits = override
     ? {
-        maxRecordingSeconds: override.maxRecordingSeconds ?? base.maxRecordingSeconds,
+        maxRecordingSeconds:
+          override.maxRecordingSeconds ?? base.maxRecordingSeconds,
         maxMonthlySeconds: override.maxMonthlySeconds ?? base.maxMonthlySeconds,
-        maxMonthlyRecordings: override.maxMonthlyRecordings ?? base.maxMonthlyRecordings,
+        maxMonthlyRecordings:
+          override.maxMonthlyRecordings ?? base.maxMonthlyRecordings,
         maxFileBytes: override.maxFileBytes ?? base.maxFileBytes,
       }
     : base;
   const monthKey = currentMonthKey();
   const used = await readMonthlyUsage(uid, monthKey);
-  return { plan, limits, used, monthKey };
+  const isDeveloper = cfg.developerUids.includes(uid);
+  return { plan, limits, used, monthKey, isDeveloper };
 }
 
 /** Enforce hard file-size cap BEFORE we even parse the upload body. */
 export function assertFileSizeAllowed(
   fileBytes: number,
-  ctx: QuotaContext,
+  ctx: QuotaContext
 ): void {
+  if (ctx.isDeveloper) return; // developer bypass
   if (fileBytes > ctx.limits.maxFileBytes) {
     throw new QuotaExceededError(
       `File too large for ${ctx.plan} plan: ${fileBytes} bytes > ${ctx.limits.maxFileBytes} bytes limit.`,
-      'file_too_large',
+      "file_too_large",
       ctx.plan,
       ctx.limits,
-      ctx.used,
+      ctx.used
     );
   }
 }
@@ -158,33 +179,38 @@ export function assertFileSizeAllowed(
  */
 export function assertWithinMonthlyQuota(
   audioSeconds: number,
-  ctx: QuotaContext,
+  ctx: QuotaContext
 ): void {
+  if (ctx.isDeveloper) return; // developer bypass
   if (audioSeconds > ctx.limits.maxRecordingSeconds) {
     throw new QuotaExceededError(
-      `Recording is ${Math.ceil(audioSeconds)}s; ${ctx.plan} plan allows max ${ctx.limits.maxRecordingSeconds}s per recording.`,
-      'recording_too_long',
+      `Recording is ${Math.ceil(audioSeconds)}s; ${ctx.plan} plan allows max ${
+        ctx.limits.maxRecordingSeconds
+      }s per recording.`,
+      "recording_too_long",
       ctx.plan,
       ctx.limits,
-      ctx.used,
+      ctx.used
     );
   }
   if (ctx.used.count >= ctx.limits.maxMonthlyRecordings) {
     throw new QuotaExceededError(
       `Monthly recording cap reached: ${ctx.used.count}/${ctx.limits.maxMonthlyRecordings} for ${ctx.plan} plan.`,
-      'monthly_recordings',
+      "monthly_recordings",
       ctx.plan,
       ctx.limits,
-      ctx.used,
+      ctx.used
     );
   }
   if (ctx.used.seconds + audioSeconds > ctx.limits.maxMonthlySeconds) {
     throw new QuotaExceededError(
-      `Monthly minute cap would be exceeded: ${ctx.used.seconds}+${Math.ceil(audioSeconds)}s > ${ctx.limits.maxMonthlySeconds}s for ${ctx.plan} plan.`,
-      'monthly_minutes',
+      `Monthly minute cap would be exceeded: ${ctx.used.seconds}+${Math.ceil(
+        audioSeconds
+      )}s > ${ctx.limits.maxMonthlySeconds}s for ${ctx.plan} plan.`,
+      "monthly_minutes",
       ctx.plan,
       ctx.limits,
-      ctx.used,
+      ctx.used
     );
   }
 }
@@ -197,7 +223,7 @@ export function assertWithinMonthlyQuota(
 export async function recordUsage(
   uid: string,
   audioSeconds: number,
-  ctx: QuotaContext,
+  ctx: QuotaContext
 ): Promise<void> {
   const ref = getFirestore().doc(`users/${uid}/usage/${ctx.monthKey}`);
   try {
@@ -208,10 +234,10 @@ export async function recordUsage(
         lastTranscriptionAt: FieldValue.serverTimestamp(),
         plan: ctx.plan,
       },
-      { merge: true },
+      { merge: true }
     );
   } catch (err) {
-    console.error('[quota] recordUsage failed (non-fatal):', err);
+    console.error("[quota] recordUsage failed (non-fatal):", err);
   }
 }
 

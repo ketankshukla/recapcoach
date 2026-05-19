@@ -371,4 +371,112 @@ void main() {
       expect(snap(900, 900).remainingMinutesLabel, '0s');
     });
   });
+
+  group('UsageSnapshot — developer bypass', () {
+    // Mirrors the server-side bypass in `api/_lib/quota.ts` and the
+    // client-side `isDeveloperProvider` (`lib/core/config/developer.dart`).
+    // The user-visible contract: a developer account NEVER hits a cap
+    // dialog, NEVER sees a non-zero usage meter, and NEVER renders
+    // "5/5 cap reached".
+
+    UsageSnapshot devSnap({
+      int usedSeconds = 9999,
+      int usedRecordings = 99,
+      int limitSeconds = 900,
+      int limitRecordings = 5,
+    }) =>
+        UsageSnapshot(
+          plan: 'free',
+          monthKey: '2026-05',
+          usedSeconds: usedSeconds,
+          usedRecordings: usedRecordings,
+          limitSeconds: limitSeconds,
+          limitRecordings: limitRecordings,
+          limitPerRecordingSeconds: 180,
+          isDeveloper: true,
+        );
+
+    test('isDeveloper defaults to false on non-dev snapshots', () {
+      // Sanity: existing fields-only snapshots in the wild must not
+      // accidentally flip into bypass mode.
+      const s = UsageSnapshot(
+        plan: 'free',
+        monthKey: '2026-05',
+        usedSeconds: 0,
+        usedRecordings: 0,
+        limitSeconds: 900,
+        limitRecordings: 5,
+        limitPerRecordingSeconds: 180,
+      );
+      expect(s.isDeveloper, isFalse);
+    });
+
+    test('[CRITICAL] isAtCap is false even when both caps are exceeded', () {
+      // The whole point of the bypass: a developer with 99 recordings
+      // and 9999 seconds against a free 5/900 cap must NOT render a
+      // CAP-reached dialog.
+      expect(devSnap().isAtCap, isFalse);
+    });
+
+    test('secondsProgress and recordingsProgress are zero', () {
+      // Meters render unfilled for developers -- the progress arc on
+      // the home card uses these getters.
+      final s = devSnap();
+      expect(s.secondsProgress, 0.0);
+      expect(s.recordingsProgress, 0.0);
+      expect(s.worstProgress, 0.0);
+    });
+
+    test('remaining* getters intentionally NOT bypassed (dead code path)', () {
+      // The `remainingSeconds` / `remainingRecordings` / `remainingMinutesLabel`
+      // helpers are only consumed by the cap-reached dialog and the
+      // "X minutes left this month" copy on the record screen -- both
+      // of which short-circuit on `isAtCap == false` for developers.
+      //
+      // So we deliberately do NOT add an `isDeveloper` branch to those
+      // getters; they keep their straightforward arithmetic. This test
+      // documents that decision so a future "let's make everything
+      // dev-aware" refactor doesn't silently change the pre-flight
+      // gating contract.
+      final s = devSnap(limitSeconds: 900, limitRecordings: 5);
+      // Used (9999, 99) wildly exceed the (900, 5) caps, so the raw
+      // arithmetic clamps remaining to zero. That's fine -- nobody
+      // reads these for a developer.
+      expect(s.remainingSeconds, 0);
+      expect(s.remainingRecordings, 0);
+      // The dev-bypass flag itself is what the UI actually checks.
+      expect(s.isDeveloper, isTrue);
+      expect(s.isAtCap, isFalse);
+    });
+
+    test('Empty factory propagates isDeveloper through', () {
+      final s = UsageSnapshot.empty(
+        plan: 'free',
+        monthKey: '2026-05',
+        isDeveloper: true,
+      );
+      expect(s.isDeveloper, isTrue);
+      expect(s.isAtCap, isFalse);
+    });
+
+    test('fromFirestore factory propagates isDeveloper through', () {
+      final s = UsageSnapshot.fromFirestore(
+        plan: 'free',
+        monthKey: '2026-05',
+        data: <String, dynamic>{
+          'transcriptionSeconds': 99999,
+          'recordingsCount': 99,
+        },
+        isDeveloper: true,
+      );
+
+      expect(s.isDeveloper, isTrue);
+      expect(s.isAtCap, isFalse);
+      // Underlying counters are still surfaced so the hero card can
+      // render "19 recordings, 4 minutes" -- they just don't trigger
+      // any cap UI.
+      expect(s.usedRecordings, 99);
+      expect(s.usedSeconds, 99999);
+    });
+  });
 }

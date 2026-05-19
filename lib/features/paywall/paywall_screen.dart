@@ -36,10 +36,21 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
     setState(() {
       _offerings = o;
       final pkgs = o?.current?.availablePackages ?? const <Package>[];
-      _selected = pkgs.firstWhere(
-        (p) => p.packageType == PackageType.annual,
-        orElse: () => pkgs.isNotEmpty ? pkgs.first : _selected!,
-      );
+      // When RevenueCat is stubbed (REVENUECAT_ANDROID_KEY not set) or
+      // the configured offering has no packages, leave `_selected` as
+      // null so the UI falls through to the stub product picker
+      // instead of NPE-ing on `_selected!`. The previous orElse
+      // dereferenced `_selected!` which was still null at this point,
+      // bricking the screen with an infinite spinner because the
+      // exception fired before `_loading = false` ran.
+      if (pkgs.isNotEmpty) {
+        _selected = pkgs.firstWhere(
+          (p) => p.packageType == PackageType.annual,
+          orElse: () => pkgs.first,
+        );
+      } else {
+        _selected = null;
+      }
       _loading = false;
     });
   }

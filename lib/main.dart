@@ -55,6 +55,18 @@ Future<void> main() async {
     await container.read(purchasesServiceProvider).configure();
     await container.read(analyticsProvider).track(AnalyticsEvents.appOpen);
 
+    // One-time log on debug builds: prints the signed-in UID so the
+    // developer can grab it for `/config/global.developerUids` in
+    // Firebase Console without rummaging through Firebase Auth.
+    if (kDebugMode) {
+      FirebaseAuth.instance.userChanges().listen((user) {
+        if (user != null) {
+          // ignore: avoid_print
+          print('[DEV-UID] ${user.uid}  email=${user.email}');
+        }
+      });
+    }
+
     runApp(
       UncontrolledProviderScope(
         container: container,

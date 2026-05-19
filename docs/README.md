@@ -60,6 +60,9 @@ This snapshot reflects the state of `main` after the **UI overhaul Phase 1 — H
 - UI design system — navy + amber palette, spacing/radii/typography tokens, semantic colors, Material 3 wiring (chapter 13).
 - Local pre-deploy `vercel build` wired up via `npm run vercel:build` (chapter 14). Auth via gitignored `secrets/vercel-cli-token`.
 - **Phase 1 home screen shipped — premium glass dashboard variant** — animated mesh-gradient background, frosted-glass cards over the mesh, hero stats card (greeting + 3-stat row with circular usage arc), glass note cards with status-color edge accents, amber→gold gradient FAB with heartbeat halo. 12 widgets in `lib/features/home/widgets/` (chapter 13 § 11).
-- 124 unit + widget tests passing (40 monetization + 21 design system Phase 0 + 63 home Phase 1).
+- **Hero stats card now reads server-backed monthly usage** (was: weekly Hive counts). Numbers on the card match the caps the server enforces, eliminating the "19 recordings this week / 5 of 5 cap reached this month" inconsistency.
+- **Developer quota bypass** — debug builds and any UID listed in `/config/global.developerUids` skip every cap check on both the client (`lib/core/config/developer.dart`) and the server (`api/_lib/quota.ts`). Cap dialogs, paywall pre-flight, and the usage meter all short-circuit. The hero card renders DEV / unlimited instead of percent-used (chapter 09 § Developer bypass).
+- **Paywall hang fixed** — empty RevenueCat package list (stub mode in dev) now renders a stub picker instead of spinning forever (`lib/features/paywall/paywall_screen.dart`).
+- 136 unit + widget tests passing (40 monetization + 21 design system Phase 0 + 75 home Phase 1+).
 
 Update this doc when you ship the next significant milestone (UI Phase 2 record screen, RevenueCat product wiring, Play Store closed testing, etc.).

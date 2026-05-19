@@ -14,6 +14,7 @@ class UsageSnapshot {
     required this.limitSeconds,
     required this.limitRecordings,
     required this.limitPerRecordingSeconds,
+    this.isDeveloper = false,
   });
 
   /// 'free' or 'pro'.
@@ -29,6 +30,14 @@ class UsageSnapshot {
   final int limitRecordings;
   final int limitPerRecordingSeconds;
 
+  /// When true, every cap-related getter behaves as if there were no
+  /// limits at all (`isAtCap` returns false, `worstProgress` returns
+  /// 0, `remainingSeconds` / `remainingRecordings` return their
+  /// limits unchanged). Set by `monthlyUsageProvider` when the user
+  /// is listed in `/config/global.developerUids` or running a debug
+  /// build (see `lib/core/config/developer.dart`).
+  final bool isDeveloper;
+
   /// Free plan defaults — must stay in sync with `api/_lib/limits.ts`.
   static const freeLimitSeconds = 900;        // 15 min
   static const freeLimitRecordings = 5;
@@ -42,6 +51,7 @@ class UsageSnapshot {
   factory UsageSnapshot.empty({
     required String plan,
     required String monthKey,
+    bool isDeveloper = false,
   }) {
     final isPro = plan == 'pro';
     return UsageSnapshot(
@@ -53,6 +63,7 @@ class UsageSnapshot {
       limitRecordings: isPro ? proLimitRecordings : freeLimitRecordings,
       limitPerRecordingSeconds:
           isPro ? proLimitPerRecordingSeconds : freeLimitPerRecordingSeconds,
+      isDeveloper: isDeveloper,
     );
   }
 
@@ -60,6 +71,7 @@ class UsageSnapshot {
     required String plan,
     required String monthKey,
     required Map<String, dynamic>? data,
+    bool isDeveloper = false,
   }) {
     final isPro = plan == 'pro';
     return UsageSnapshot(
@@ -71,26 +83,34 @@ class UsageSnapshot {
       limitRecordings: isPro ? proLimitRecordings : freeLimitRecordings,
       limitPerRecordingSeconds:
           isPro ? proLimitPerRecordingSeconds : freeLimitPerRecordingSeconds,
+      isDeveloper: isDeveloper,
     );
   }
 
   /// 0.0 .. 1.0 progress against the monthly seconds cap (clamped).
+  /// Always 0 for developer accounts so meters render unfilled.
   double get secondsProgress {
+    if (isDeveloper) return 0;
     if (limitSeconds <= 0) return 0;
     final p = usedSeconds / limitSeconds;
     return p.isNaN ? 0 : p.clamp(0.0, 1.0);
   }
 
   /// 0.0 .. 1.0 progress against the monthly recordings cap (clamped).
+  /// Always 0 for developer accounts.
   double get recordingsProgress {
+    if (isDeveloper) return 0;
     if (limitRecordings <= 0) return 0;
     final p = usedRecordings / limitRecordings;
     return p.isNaN ? 0 : p.clamp(0.0, 1.0);
   }
 
   /// True when either the minute cap or the recording-count cap is exhausted.
-  bool get isAtCap =>
-      usedSeconds >= limitSeconds || usedRecordings >= limitRecordings;
+  /// Always false for developer accounts (the bypass mirrored on the server).
+  bool get isAtCap {
+    if (isDeveloper) return false;
+    return usedSeconds >= limitSeconds || usedRecordings >= limitRecordings;
+  }
 
   /// Worst-case "highest of the two meters" progress, for a single meter UI.
   double get worstProgress =>
