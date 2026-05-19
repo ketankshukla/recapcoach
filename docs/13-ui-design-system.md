@@ -654,6 +654,45 @@ that the home cards push into.
   floating back button + a centred "Note not found." message) instead
   of falling back to a flat M3 surface mid-flow.
 
+### Sign in (`lib/features/auth/sign_in_screen.dart`)
+
+Fifth non-home screen on the glass theme -- and the _first_ screen
+new users see, so it's the first impression of the brand. Layout:
+
+- **Sits over `MeshGradientBackground`.**
+- **Hero `_BrandMedal`.** 80 dp amber-gradient disc with a soft amber
+  bloom shadow and the `graphic_eq_rounded` glyph. Replaces the
+  M3 plain-text title-only header.
+- **Display title.** "Welcome back" / "Create your account", 30 dp,
+  `letterSpacing: -0.5`.
+- **Single muted subtitle line.** "Sign in to sync your data across
+  devices."
+- **Email + password card.** A `GlassCard` wraps both inputs, the
+  inline `_ErrorChip`, the primary CTA, and the sign-in / sign-up
+  toggle so the whole "credentials" group reads as one surface.
+- **`_GlassTextField` private widget.** Mesh-aware `TextField` wrapper
+  with a 6 % white fill (dark) / 55 % white fill (light), 1 px hairline
+  border, `borderRadius: 14`, amber-600 cursor + focus border. Prefix
+  icon uses the muted-foreground colour. Replaces the M3 default
+  underline-style `InputDecoration`.
+- **Primary CTA** is the shared `GradientPillButton` with `loading: _busy`,
+  so the busy state automatically swallows double-taps (matches the
+  Paywall + Record CTAs).
+- **`_ErrorChip`.** Inline red-tinted glass-style chip with an icon
+  and the auth error message. Replaces the M3 plain-text red error.
+- **`_OrDivider`.** Two hairlines flanking a centred "or" label,
+  hairline colour adjusted for the mesh.
+- **Google button.** Hand-rolled `_GoogleButton`: glass-outlined pill
+  with the G mark + "Continue with Google" label. Disabled state
+  drops opacity to 0.55 so the brand colour stays visible. Replaces
+  the M3 `OutlinedButton.icon`.
+- **Anonymous sign-in.** Quiet centred `TextButton` ("Skip — try it
+  first") at the bottom.
+
+The whole screen is centred + scrollable so it works on small
+landscape phones too -- previously the M3 layout would crop the
+"Skip" button on short keyboards.
+
 ### Tests
 
 | File                                                            | Tests | Coverage                                                                              |
