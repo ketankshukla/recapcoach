@@ -693,6 +693,40 @@ The whole screen is centred + scrollable so it works on small
 landscape phones too -- previously the M3 layout would crop the
 "Skip" button on short keyboards.
 
+### Onboarding (`lib/features/onboarding/onboarding_screen.dart`)
+
+Sixth (and last) screen on the glass theme. The 3-page intro carousel
+new users see before the first home screen render. Final piece of the
+brand-first-impression chain: Onboarding → Sign in → Home.
+
+- **Sits over `MeshGradientBackground`.**
+- **Skip pill.** Floating `GlassPillButton` ("Skip") in the top-right,
+  replacing the M3 `TextButton`. Calls the same `markComplete()` path
+  as the final-page CTA.
+- **Three pages, all RecapCoach-specific copy.** Old M3 cut still
+  shipped the boilerplate "Your starter kit for shipping Android apps"
+  language from a template; new pages are:
+  1. _Recap any call instantly_ -- value prop.
+  2. _Free to start_ -- tier explanation (5 free / 100 + 8h Pro).
+  3. _Private by default_ -- privacy stance.
+- **`_HeroDisc`.** 132 dp amber-gradient circle with a 1.5 px white
+  hairline border and two stacked amber bloom shadows -- same halo
+  vocabulary as the home FAB and the record-screen mic disc, so the
+  brand feels consistent before the user has even seen those screens.
+- **Display title.** 30 dp, `letterSpacing: -0.5`, centred.
+- **Body copy.** 15.5 dp muted, `height: 1.5`, centred.
+- **Page indicator.** `SmoothPageIndicator` with `WormEffect`,
+  active dot tinted `AppColors.amber600`, inactive dots a
+  low-alpha slate so they read on the mesh.
+- **Bottom CTA.** Shared `GradientPillButton`. On the last page the
+  label flips to "Get started" + adds a forward-arrow icon for an
+  extra "this is the moment of commit" beat.
+- **`use_build_context_synchronously` warning fixed.** The old
+  M3 cut had a `context.go(...)` call after an `await` guarded only
+  by an unrelated `mounted` check; the new
+  `_completeAndGoHome()` adds the explicit guard before each
+  `context` use.
+
 ### Tests
 
 | File                                                            | Tests | Coverage                                                                              |

@@ -63,12 +63,13 @@ This snapshot reflects the state of `main` after the **UI overhaul Phase 1 — H
 - **Hero stats card now reads server-backed monthly usage** (was: weekly Hive counts). Numbers on the card match the caps the server enforces, eliminating the "19 recordings this week / 5 of 5 cap reached this month" inconsistency.
 - **Developer quota bypass** — debug builds and any UID listed in `/config/global.developerUids` skip every cap check on both the client (`lib/core/config/developer.dart`) and the server (`api/_lib/quota.ts`). Cap dialogs, paywall pre-flight, and the usage meter all short-circuit. The hero card renders DEV / unlimited instead of percent-used (chapter 09 § Developer bypass).
 - **Paywall hang fixed** — empty RevenueCat package list (stub mode in dev) now renders a stub picker instead of spinning forever (`lib/features/paywall/paywall_screen.dart`).
-- **Phase 2 glass theme rollout — Paywall + Record + Settings + Note detail + Sign in shipped.**
-  - Paywall sits over `MeshGradientBackground` with hero amber medal disc, glass benefits card, glass product tiles, amber-gradient `BEST VALUE` badge.
-  - Record screen: amber-gradient `AmplitudePulseMic` with live-amplitude halos, glass timer card, amber-gradient `AmplitudeWaveform`, glass discard / Stop & save controls.
-  - Settings: M3 `ListView`-of-`ListTile`s replaced with four mesh-backed `GlassCard` sections; destructive Delete uses `GlassAlertDialog(primaryDestructive: true)`.
-  - Note detail: glass everywhere — display title + metadata header, redesigned `NotePlayer` (amber-gradient play disc + amber slider), three section `GlassCard`s with amber icon avatars, processing / error / empty / content state machine.
-  - Sign in: amber-gradient `_BrandMedal` hero, glass-themed credentials card with the new `_GlassTextField` (amber-600 focus border, transparent fill), `_ErrorChip`, hand-rolled glass `_GoogleButton`. First impression of the brand now matches the rest of the product (chapter 13 § 12).
+- **Phase 2 glass theme rollout COMPLETE — every secondary screen migrated to the mesh-glass vocabulary.** Paywall + Record + Settings + Note detail + Sign in + Onboarding (chapter 13 § 12). The whole user journey from first launch (Onboarding → Sign in → Home → Record → Note detail → Paywall → Settings) now feels like a single coherent product instead of "the home screen plus a Material 3 settings page."
+  - Onboarding: 3 RecapCoach-specific pages (was: generic template copy), 132 dp amber-gradient hero discs with two-layer bloom shadows, amber `WormEffect` page indicator, floating glass `Skip` pill, shared `GradientPillButton` CTA that flips to "Get started" + arrow on the last page.
+  - Sign in: amber `_BrandMedal` hero, glass-themed credentials card with `_GlassTextField` (amber-600 focus border, transparent fill), inline `_ErrorChip`, hand-rolled glass `_GoogleButton`.
+  - Note detail: header w/ display title + metadata row, redesigned `NotePlayer` (amber-gradient play disc + amber slider), three section `GlassCard`s (Summary / Action items / Transcript) with amber icon avatars + copy-to-clipboard.
+  - Settings: four mesh-backed `GlassCard` sections (Account / Subscription / Legal & support / Account actions); destructive Delete uses `GlassAlertDialog(primaryDestructive: true)`.
+  - Record: amber `AmplitudePulseMic` with live-amplitude halos, glass timer card, amber `AmplitudeWaveform`, glass discard / Stop & save.
+  - Paywall: hero amber medal, glass benefits card, glass product tiles with amber `BEST VALUE` badge.
 - Four shared primitives in `lib/core/widgets/glass/`: `GradientPillButton`, `GlassIconButton`, `GlassPillButton`, `GlassAlertDialog`.
 
 Update this doc when you ship the next significant milestone (UI Phase 2 record screen, RevenueCat product wiring, Play Store closed testing, etc.).
