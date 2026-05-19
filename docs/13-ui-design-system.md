@@ -615,6 +615,45 @@ Third non-home screen on the glass theme. Replaces a flat
   outlined button -- destructive actions never sit in the visual
   slot the brain associates with "good".
 
+### Note detail (`lib/features/notes/note_detail_screen.dart`)
+
+Fourth non-home screen on the glass theme. The "open one note" view
+that the home cards push into.
+
+- **No AppBar.** Back is a floating `GlassIconButton` in the top-left,
+  Delete is a red-tinted `GlassIconButton` in the top-right.
+- **Sits over `MeshGradientBackground`** (consistent with home / paywall /
+  record / settings).
+- **Header.** 28 dp display title (`note.displayTitle`) with a 13 dp
+  metadata row underneath: clock icon + duration + recorded date
+  (`MMM d, y · h:mm a`). Replaces the old M3 "leading avatar +
+  Duration X" `Card`.
+- **`NotePlayer` redesigned.** Now a `GlassCard` with a 52 dp circular
+  amber-gradient `_PlayPauseDisc` (white play / pause icon, soft
+  amber bloom shadow) and an amber-tinted slider track + thumb.
+  Disabled state drops the disc opacity to 0.55 instead of swapping
+  to a desaturated grey -- the brand colour stays visible.
+- **Three glass section cards**: Summary, Action items, Transcript.
+  Each section card has a `_SectionHeader` with a small amber-tinted
+  rounded-square icon avatar (Auto-awesome / Checklist / Subject)
+  next to the title. Sections gracefully render four states:
+  processing (amber spinner + "Processing…"), error (`error600`
+  text), empty (muted placeholder), or content (selectable text so
+  the user can copy partial passages).
+- **Copy actions.** The Summary and Transcript headers expose a
+  copy-to-clipboard `IconButton` (only visible when the content is
+  populated). Tapping shows a Material `SnackBar` -- intentional, the
+  Material snackbar reads naturally over the glass surface.
+- **Action items.** Hand-rolled bulleted list with a 16 dp
+  amber-bordered square bullet per item, consistent with the
+  amber-as-accent rule. The list uses `SelectableText` everywhere so
+  users can grab partial action items.
+- **Delete confirmation.** Shared `GlassAlertDialog` with
+  `primaryDestructive: true`.
+- **Note-not-found state.** Renders a minimal glass screen (mesh +
+  floating back button + a centred "Note not found." message) instead
+  of falling back to a flat M3 surface mid-flow.
+
 ### Tests
 
 | File                                                            | Tests | Coverage                                                                              |
