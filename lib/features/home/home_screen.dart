@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/router/app_router.dart';
+import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../auth/auth_providers.dart';
 import '../notes/note.dart';
@@ -10,41 +11,46 @@ import '../notes/note_providers.dart';
 import '../usage/usage.dart';
 import '../usage/usage_provider.dart';
 import 'widgets/empty_state.dart';
-import 'widgets/home_app_bar.dart';
+import 'widgets/mesh_gradient_background.dart';
 import 'widgets/note_card.dart';
 import 'widgets/pulsing_record_fab.dart';
 import 'widgets/skeleton_note_card.dart';
-import 'widgets/usage_meter.dart';
+import 'widgets/weekly_stats_card.dart';
 
-/// Home screen for RecapCoach.
+/// Home screen — premium glass dashboard variant.
 ///
-/// Phase 1 layout (per docs/08-roadmap.md):
+/// Layout:
 ///
-///   ┌───────────────────────────────────────────────┐
-///   │ [avatar]  Good morning,           [settings]  │
-///   │           Ketan                                │
-///   ├───────────────────────────────────────────────┤
-///   │  ┌────────── usage meter ──────────────────┐  │
-///   │  │ This month • [PRO/FREE]                 │  │
-///   │  │ ████████░░░░░░  (gradient, animated)    │  │
-///   │  │ 2 of 5 recordings • 4 / 15 min          │  │
-///   │  └─────────────────────────────────────────┘  │
-///   │                                               │
-///   │  Recent recordings                            │
-///   │  ┌────────── note card ────────────────────┐  │
-///   │  │ [icon] Title              [chevron]     │  │
-///   │  │        [Done] 2:14                      │  │
-///   │  │        Summary preview...               │  │
-///   │  └─────────────────────────────────────────┘  │
+///   ┌────────────────────────────────────────────────┐
+///   │ ░░░░░░░  animated mesh gradient ░░░░░░░░░     │ ← scaffold body
+///   │                                                │
+///   │  ╭──────────────── glass ────────────────╮    │
+///   │  │ [avatar]                       [⚙ ]  │    │ ← WeeklyStatsCard
+///   │  │                                       │    │   (hero)
+///   │  │ Good evening,                         │    │
+///   │  │ Ketan                                 │    │
+///   │  │                                       │    │
+///   │  │  3        47       ◯ 40%              │    │
+///   │  │ recordings min      used              │    │
+///   │  ╰───────────────────────────────────────╯    │
+///   │                                                │
+///   │  RECENT RECORDINGS                            │
+///   │  ╭──────────── glass ──────────────────╮      │
+///   │  │ ▌[icn] Title                  [▸]  │      │ ← NoteCard (glass)
+///   │  │       [chip] 2:14                  │      │
+///   │  │       Summary preview...            │      │
+///   │  ╰─────────────────────────────────────╯      │
 ///   │                ...                            │
-///   │                                               │
-///   │                    ┌──────────────┐           │
-///   │                    │  🎤 Record   │ ← pulse   │
-///   │                    └──────────────┘           │
-///   └───────────────────────────────────────────────┘
+///   │                                                │
+///   │                       ┌────────────────┐      │
+///   │                       │ 🎤 Record call │ pulse│ ← gradient FAB
+///   │                       └────────────────┘      │
+///   └────────────────────────────────────────────────┘
 ///
-/// On empty state we collapse the list into a single hero illustration
-/// so brand-new users have a clear destination for their first recording.
+/// The Scaffold uses no AppBar -- the hero glass card occupies the
+/// top region instead, giving us more visual real estate. The mesh
+/// gradient is the actual background, so Scaffold.backgroundColor is
+/// transparent.
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
@@ -55,23 +61,36 @@ class HomeScreen extends ConsumerWidget {
     final usage = ref.watch(monthlyUsageProvider).value;
 
     return Scaffold(
-      appBar: HomeAppBar(
-        displayName: user?.displayName,
-        email: user?.email,
-        photoUrl: user?.photoURL,
-        onSettings: () => context.push(AppRoutes.settings),
-      ),
-      body: RefreshIndicator(
-        onRefresh: () async {
-          // Streams auto-refresh; the explicit delay is so the user
-          // sees the indicator complete a cycle and feels the gesture
-          // "did something" even on offline.
-          await Future<void>.delayed(const Duration(milliseconds: 350));
-        },
-        child: notesAsync.when(
-          data: (notes) => _HomeBody(notes: notes, usage: usage),
-          loading: () => _HomeBody.skeleton(usage: usage),
-          error: (e, _) => _HomeError(error: e),
+      backgroundColor: Colors.transparent,
+      // Body extends behind the (absent) status bar so the mesh
+      // covers the full screen.
+      extendBodyBehindAppBar: true,
+      body: MeshGradientBackground(
+        child: SafeArea(
+          bottom: false,
+          child: RefreshIndicator(
+            onRefresh: () async {
+              await Future<void>.delayed(const Duration(milliseconds: 350));
+            },
+            child: notesAsync.when(
+              data: (notes) => _HomeBody(
+                notes: notes,
+                usage: usage,
+                displayName: user?.displayName,
+                email: user?.email,
+                photoUrl: user?.photoURL,
+                onSettings: () => context.push(AppRoutes.settings),
+              ),
+              loading: () => _HomeBody.skeleton(
+                usage: usage,
+                displayName: user?.displayName,
+                email: user?.email,
+                photoUrl: user?.photoURL,
+                onSettings: () => context.push(AppRoutes.settings),
+              ),
+              error: (e, _) => _HomeError(error: e),
+            ),
+          ),
         ),
       ),
       floatingActionButton: PulsingRecordFab(
@@ -82,58 +101,74 @@ class HomeScreen extends ConsumerWidget {
 }
 
 class _HomeBody extends StatelessWidget {
-  const _HomeBody({required this.notes, required this.usage})
-      : _isSkeleton = false;
+  const _HomeBody({
+    required this.notes,
+    required this.usage,
+    required this.displayName,
+    required this.email,
+    required this.photoUrl,
+    required this.onSettings,
+  }) : _isSkeleton = false;
 
-  const _HomeBody.skeleton({required this.usage})
-      : notes = const [],
+  const _HomeBody.skeleton({
+    required this.usage,
+    required this.displayName,
+    required this.email,
+    required this.photoUrl,
+    required this.onSettings,
+  })  : notes = const [],
         _isSkeleton = true;
 
   final List<Note> notes;
   final UsageSnapshot? usage;
+  final String? displayName;
+  final String? email;
+  final String? photoUrl;
+  final VoidCallback onSettings;
   final bool _isSkeleton;
 
   @override
   Widget build(BuildContext context) {
     final children = <Widget>[
-      if (usage != null) ...[
-        UsageMeter(usage: usage!),
-        const SizedBox(height: AppSpacing.md),
-      ],
+      WeeklyStatsCard(
+        displayName: displayName,
+        email: email,
+        photoUrl: photoUrl,
+        onSettings: onSettings,
+        notes: notes,
+        usage: usage,
+      ),
+      const SizedBox(height: AppSpacing.lg),
       if (_isSkeleton) ...[
-        // Placeholder header so layout doesn't shift when real data
-        // loads.
-        const _SectionHeader(label: 'Recent recordings'),
+        const _SectionHeader(label: 'RECENT RECORDINGS'),
         const SizedBox(height: AppSpacing.xs),
         for (int i = 0; i < 3; i++) ...[
           const SkeletonNoteCard(),
-          const SizedBox(height: AppSpacing.xs),
+          const SizedBox(height: AppSpacing.sm),
         ],
       ] else if (notes.isEmpty) ...[
-        const SizedBox(height: AppSpacing.lg),
+        const SizedBox(height: AppSpacing.md),
         const HomeEmptyState(),
       ] else ...[
-        const _SectionHeader(label: 'Recent recordings'),
+        const _SectionHeader(label: 'RECENT RECORDINGS'),
         const SizedBox(height: AppSpacing.xs),
         for (final n in notes) ...[
           NoteCard(
             note: n,
             onTap: () => context.push('${AppRoutes.notes}/${n.id}'),
           ),
-          const SizedBox(height: AppSpacing.xs),
+          const SizedBox(height: AppSpacing.sm),
         ],
       ],
     ];
 
     return ListView(
-      // physics ensures the RefreshIndicator can fire even when the
-      // content is short enough to not scroll naturally.
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.md,
         AppSpacing.md,
         AppSpacing.md,
-        96, // FAB clearance
+        120, // FAB clearance
       ),
       children: children,
     );
@@ -148,14 +183,19 @@ class _SectionHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final color = isDark
+        ? Colors.white.withValues(alpha: 0.55)
+        : AppColors.slate500.withValues(alpha: 0.85);
     return Padding(
-      padding: const EdgeInsets.only(left: 4, top: 4, bottom: 2),
+      padding: const EdgeInsets.only(left: 6, top: 4, bottom: 2),
       child: Text(
         label,
-        style: theme.textTheme.labelLarge?.copyWith(
-          color: theme.colorScheme.onSurfaceVariant,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.4,
+        style: theme.textTheme.labelSmall?.copyWith(
+          color: color,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 1.4,
+          fontSize: 11,
         ),
       ),
     );
@@ -170,6 +210,11 @@ class _HomeError extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final fg = isDark ? const Color(0xFFF7F4EE) : AppColors.ink900;
+    final fgMuted = isDark
+        ? const Color(0xFFD8D4CB)
+        : AppColors.slate500;
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(AppSpacing.xl),
@@ -178,21 +223,19 @@ class _HomeError extends StatelessWidget {
         Icon(
           Icons.cloud_off_rounded,
           size: 56,
-          color: theme.colorScheme.onSurfaceVariant,
+          color: fgMuted,
         ),
         const SizedBox(height: AppSpacing.md),
         Text(
           'Could not load notes',
           textAlign: TextAlign.center,
-          style: theme.textTheme.titleMedium,
+          style: theme.textTheme.titleMedium?.copyWith(color: fg),
         ),
         const SizedBox(height: AppSpacing.xs),
         Text(
           '$error',
           textAlign: TextAlign.center,
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
+          style: theme.textTheme.bodySmall?.copyWith(color: fgMuted),
         ),
       ],
     );

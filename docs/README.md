@@ -59,7 +59,7 @@ This snapshot reflects the state of `main` after the **UI overhaul Phase 1 — H
 - Financial projections + test plan + solo-developer playbook (chapters 10-12).
 - UI design system — navy + amber palette, spacing/radii/typography tokens, semantic colors, Material 3 wiring (chapter 13).
 - Local pre-deploy `vercel build` wired up via `npm run vercel:build` (chapter 14). Auth via gitignored `secrets/vercel-cli-token`.
-- **Phase 1 home screen shipped** — time-based greeting app bar, status-chip note cards, gradient + animated usage meter, hero empty state, pulsing record FAB, skeleton loaders. 10 new home widgets in `lib/features/home/widgets/` (chapter 13 § 11).
-- 110 unit + widget tests passing (40 monetization + 21 design system Phase 0 + 49 home Phase 1).
+- **Phase 1 home screen shipped — premium glass dashboard variant** — animated mesh-gradient background, frosted-glass cards over the mesh, hero stats card (greeting + 3-stat row with circular usage arc), glass note cards with status-color edge accents, amber→gold gradient FAB with heartbeat halo. 12 widgets in `lib/features/home/widgets/` (chapter 13 § 11).
+- 124 unit + widget tests passing (40 monetization + 21 design system Phase 0 + 63 home Phase 1).
 
 Update this doc when you ship the next significant milestone (UI Phase 2 record screen, RevenueCat product wiring, Play Store closed testing, etc.).

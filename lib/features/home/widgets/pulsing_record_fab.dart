@@ -1,20 +1,24 @@
 import 'package:flutter/material.dart';
 
-import '../../../core/theme/app_radii.dart';
-import '../../../core/theme/app_semantic_colors.dart';
+import '../../../core/theme/app_colors.dart';
 
-/// Floating action button that gently pulses to draw the user's eye to
-/// "Record call".
+/// Premium gradient "Record call" button with a slow heartbeat halo.
 ///
-/// The pulse is implemented as an outer colored shadow that grows from
-/// a tight, opaque-ish glow to a wide, faded one over 1.6 seconds, then
-/// loops. We deliberately keep the amplitude small (a few extra pixels
-/// of blur, ~30% peak alpha) so it reads as an inviting heartbeat
-/// rather than a jittery distraction.
+/// Replaces the stock `FloatingActionButton.extended` with a pill
+/// rendered from an `amber600 → amber400` linear gradient and an
+/// outer pulsing glow. The halo is implemented as a `BoxShadow`
+/// whose alpha + blurRadius + spreadRadius are driven by an
+/// `AnimationController` repeating every 1.6 seconds.
 ///
-/// The animation is driven by an [AnimationController] that we dispose
-/// in [dispose]; widget tests can verify the controller is set up via
-/// `tester.pump(Duration)`.
+/// Visuals:
+///
+///  - Pill shape, 56 dp tall.
+///  - Gradient fill: amber-600 (top-left) → amber-400 (bottom-right).
+///  - White text + mic icon for maximum contrast.
+///  - Heartbeat halo: amber-400 at 35% peak alpha, 14-32 dp blur,
+///    1-6 dp spread. Subtle but present.
+///  - Inner highlight: a 1 px white-with-low-alpha ring at the top
+///    edge that catches the eye and gives a "polished metal" feel.
 class PulsingRecordFab extends StatefulWidget {
   const PulsingRecordFab({
     super.key,
@@ -52,34 +56,75 @@ class _PulsingRecordFabState extends State<PulsingRecordFab>
 
   @override
   Widget build(BuildContext context) {
-    final pulseColor = Theme.of(context).extension<AppSemanticColors>()!.recordingPulse;
-
     return AnimatedBuilder(
       animation: _ctrl,
       builder: (context, child) {
         final t = _ctrl.value;
-        // t ∈ [0,1]: at t=0 the pulse is tight + visible, by t=1 it's
-        // wide + transparent. Curves.easeOut feels like a heartbeat;
-        // a strict linear t looks robotic.
         final eased = Curves.easeOut.transform(t);
-        return Container(
+        return DecoratedBox(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(AppRadii.pill),
+            borderRadius: BorderRadius.circular(28),
             boxShadow: [
+              // Heartbeat halo.
               BoxShadow(
-                color: pulseColor.withValues(alpha: 0.32 * (1 - eased)),
-                blurRadius: 12 + 18 * eased,
-                spreadRadius: 1 + 4 * eased,
+                color: AppColors.amber400.withValues(alpha: 0.35 * (1 - eased)),
+                blurRadius: 14 + 18 * eased,
+                spreadRadius: 1 + 5 * eased,
+              ),
+              // Constant amber drop shadow under the pill so it feels
+              // grounded even at the dim end of the heartbeat cycle.
+              BoxShadow(
+                color: AppColors.amber700.withValues(alpha: 0.35),
+                blurRadius: 16,
+                offset: const Offset(0, 8),
               ),
             ],
           ),
           child: child,
         );
       },
-      child: FloatingActionButton.extended(
-        onPressed: widget.onPressed,
-        icon: Icon(widget.icon),
-        label: Text(widget.label),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: widget.onPressed,
+          borderRadius: BorderRadius.circular(28),
+          splashColor: Colors.white.withValues(alpha: 0.12),
+          highlightColor: Colors.white.withValues(alpha: 0.06),
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(28),
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  AppColors.amber600,
+                  AppColors.amber400,
+                ],
+              ),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.20),
+                width: 1,
+              ),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 16),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(widget.icon, color: Colors.white, size: 22),
+                const SizedBox(width: 10),
+                Text(
+                  widget.label,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.2,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

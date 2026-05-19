@@ -32,7 +32,10 @@ void main() {
     testWidgets('Tap fires the onPressed callback', (tester) async {
       var taps = 0;
       await _pump(tester, onPressed: () => taps++);
-      await tester.tap(find.byType(FloatingActionButton));
+      // The redesigned FAB is no longer a `FloatingActionButton` --
+      // it's a custom gradient pill (Container + InkWell) so we tap
+      // by widget type. There's only one PulsingRecordFab on screen.
+      await tester.tap(find.byType(PulsingRecordFab));
       await tester.pump();
       expect(taps, 1);
     });

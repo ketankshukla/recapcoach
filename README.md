@@ -102,7 +102,7 @@ recapcoach/
 │  │  └─ widgets/          feature_gate, loading_view, error_view
 │  ├─ features/
 │  │  ├─ auth/             Firebase Auth + Google Sign-In
-│  │  ├─ home/             home screen + widgets/ (greeting bar, note card, status chip, usage meter, pulsing FAB, skeleton, empty state)
+│  │  ├─ home/             home screen + widgets/ (mesh gradient, glass cards, hero stats, arc usage ring, gradient FAB, glass note cards, glass empty state, skeleton)
 │  │  ├─ legal/            terms / privacy viewer
 │  │  ├─ notes/            Note model, Hive + Firestore repos, sync, list/detail UI, player
 │  │  ├─ onboarding/       first-run flow
@@ -113,11 +113,11 @@ recapcoach/
 │  │  └─ usage/            monthly UsageSnapshot model + live Firestore stream
 │  └─ shared/              cross-feature providers + services
 ├─ docs/                   Documentation (see above)
-├─ test/                   Flutter unit + widget tests (110 tests, all passing)
+├─ test/                   Flutter unit + widget tests (124 tests, all passing)
 │  ├─ core/
 │  │  └─ theme/            Design-system token + ThemeData wiring tests
 │  └─ features/
-│     ├─ home/widgets/     Phase 1 home component tests (greeting, status, chip, card, meter, app bar, avatar, empty state, FAB pulse)
+│     ├─ home/widgets/     Phase 1 glass-dashboard component tests (greeting, status, chip, glass card, arc ring, weekly stats, note card, empty state, FAB pulse, avatar)
 │     ├─ usage/            UsageSnapshot math + currentUtcMonthKey UTC rollover tests
 │     └─ transcription/    TranscriptionException / error-kind sanity tests
 ├─ firestore.rules         Per-user isolation + read-only usage docs + admin-only /config/global
@@ -161,7 +161,7 @@ See [docs/PUBLISH.md](docs/PUBLISH.md) for the full Play Store closed-testing ch
 ## Tests
 
 ```powershell
-# Flutter unit + widget tests (110 tests, runs in ~12 seconds)
+# Flutter unit + widget tests (124 tests, runs in ~13 seconds)
 flutter test
 
 # Static analysis (zero issues in app code; existing infos are pre-existing)

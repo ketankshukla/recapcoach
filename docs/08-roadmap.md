@@ -262,15 +262,15 @@ Worth being explicit about, since these are tempting but bad ideas at this stage
 
 Aesthetic direction: **Direction A — Deep navy + warm amber** (Stripe / Linear feel; signals "expensive enough to be serious" to the consulting audience). Documented in [chapter 13](13-ui-design-system.md).
 
-| Phase | Scope                                                                                                                             | Visible? | Effort | Status         |
-| ----- | --------------------------------------------------------------------------------------------------------------------------------- | -------- | ------ | -------------- |
-| **0** | Design system foundation — palette, spacing, radii, typography, semantic tokens, Material 3 theme wiring                          | No       | 3-4 hr | **✅ SHIPPED** |
-| **1** | Home screen — empty state, status-chip note cards, redesigned usage meter, time-based greeting, FAB with pulse, skeleton loading  | Yes      | 4-5 hr | **✅ SHIPPED** |
-| **2** | Record screen — animated waveform (history buffer, ~60fps), tabular timer, smooth state transitions, mini quota indicator         | Yes      | 5-6 hr | Pending        |
-| **3** | Note detail — hero transition, sectioned layout, polished audio player with speed control, action-item checklist, share menu      | Yes      | 4-5 hr | Pending        |
-| **4** | Paywall — feature comparison table, monthly/yearly toggle with "Save 48%" badge, "most popular" highlight, trust elements         | Yes      | 4-5 hr | Pending        |
-| **5** | Settings — sectioned cards, avatar + plan badge, manage-subscription deep link, usage section, export-data / delete-account flows | Yes      | 3-4 hr | Pending        |
-| **6** | Auth + onboarding — 3-screen intro with subtle animations, polished sign-in, sign-out confirmation                                | Yes      | 2-3 hr | Pending        |
+| Phase | Scope                                                                                                                                                    | Visible? | Effort | Status         |
+| ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | ------ | -------------- |
+| **0** | Design system foundation — palette, spacing, radii, typography, semantic tokens, Material 3 theme wiring                                                 | No       | 3-4 hr | **✅ SHIPPED** |
+| **1** | Home screen — premium glass dashboard: animated mesh gradient, frosted glass cards, hero stats card with arc usage ring, gradient FAB, glass empty state | Yes      | 4-5 hr | **✅ SHIPPED** |
+| **2** | Record screen — animated waveform (history buffer, ~60fps), tabular timer, smooth state transitions, mini quota indicator                                | Yes      | 5-6 hr | Pending        |
+| **3** | Note detail — hero transition, sectioned layout, polished audio player with speed control, action-item checklist, share menu                             | Yes      | 4-5 hr | Pending        |
+| **4** | Paywall — feature comparison table, monthly/yearly toggle with "Save 48%" badge, "most popular" highlight, trust elements                                | Yes      | 4-5 hr | Pending        |
+| **5** | Settings — sectioned cards, avatar + plan badge, manage-subscription deep link, usage section, export-data / delete-account flows                        | Yes      | 3-4 hr | Pending        |
+| **6** | Auth + onboarding — 3-screen intro with subtle animations, polished sign-in, sign-out confirmation                                                       | Yes      | 2-3 hr | Pending        |
 
 Each phase ships as its own commit per the test-first commit discipline rule: docs updated, tests added/updated, `flutter test` green before pushing.
 

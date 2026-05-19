@@ -27,12 +27,12 @@ find a new failure mode, and we never delete them.
 Total target: **~120 tests**. Most are unit tests, which run in milliseconds.
 The whole suite should complete in under 60 seconds on a laptop.
 
-**Current state (after UI overhaul Phase 1 — home screen):** 110 tests
-passing, ~12 seconds to run. Breakdown:
+**Current state (after UI overhaul Phase 1 — glass dashboard):** 124
+tests passing, ~13 seconds to run. Breakdown:
 
 - 21 design-system token + theme-wiring tests (`test/core/theme/`)
 - 40 monetization tests (`test/features/usage/` + `test/features/transcription/`)
-- 49 home-screen widget tests (`test/features/home/widgets/`)
+- 63 glass-dashboard home widget tests (`test/features/home/widgets/`)
 - 1 sanity smoke test (`test/widget_test.dart`)
 
 Closing in on the ~120 target. The remaining gaps are mostly the

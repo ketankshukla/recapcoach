@@ -364,62 +364,128 @@ flutter test test\core\theme\
 
 ---
 
-## 11. Phase 1 — Home screen components
+## 11. Phase 1 — Home screen (premium glass dashboard)
 
 Phase 1 ([08-roadmap.md](08-roadmap.md)) is the first visible
-application of the design system. Every Phase 1 widget reads its
-colors / spacing / radii through the patterns in section 9 — nothing
-hard-coded.
+application of the design system. The first cut shipped a
+conventional Material 3 layout; the **glass-dashboard variant** in
+this section replaced it after user feedback that the M3 look felt
+"too plain and monotonously simple."
 
-**Files:**
+The new look is built on three primitives that are reused by
+subsequent phases:
+
+1. **Mesh-gradient background** (`MeshGradientBackground`) — animated
+   `CustomPainter` that drifts three radial-gradient blobs over a
+   28-second period. Light + dark palettes are independent: dark uses
+   ink + navy + amber bloom + sage; light uses cream + amber-100 +
+   sage-300 + navy-100.
+2. **Frosted glass surfaces** (`GlassCard`) — `BackdropFilter`-blurred
+   container with a 1px hairline border, low-alpha fill, and a soft
+   amber- (dark) or navy-tinted (light) drop shadow. The card "floats"
+   over the mesh.
+3. **Hero stats card** (`WeeklyStatsCard`) — replaces the AppBar +
+   AccountCard + horizontal usage meter combo with a single statement
+   element: avatar + greeting in 34 pt display weight + 3-stat row
+   (this-week recordings, this-week minutes, circular usage arc).
+
+### Files
 
 ```
 lib/features/home/widgets/
-├── time_based_greeting.dart  Pure helper: hour → "Good morning/afternoon/evening"
-├── home_app_bar.dart         AppBar with avatar + greeting + settings
-├── user_avatar.dart          Photo-or-initials circle (navy bg + amber initials)
-├── empty_state.dart          Hero illustration + "Capture your first call"
-├── note_card.dart            Card with icon + title + status chip + summary
-├── note_status.dart          NoteStatus enum + Note → status mapping
-├── note_status_chip.dart     Pill chip (Transcribing / Done / Failed / Pending)
-├── usage_meter.dart          Gradient + animated bar with FREE/PRO badge
-├── skeleton_note_card.dart   Loading placeholder matching NoteCard shape
-└── pulsing_record_fab.dart   FAB with subtle amber heartbeat shadow
+├── time_based_greeting.dart    Pure helper: hour → greeting
+├── note_status.dart            NoteStatus enum + Note→status mapping
+├── note_status_chip.dart       Pill chip (Transcribing/Done/Failed/Pending)
+├── user_avatar.dart            Photo-or-initials circle
+├── mesh_gradient_background.dart  Animated mesh, light + dark palettes
+├── glass_card.dart             BackdropFilter wrapper, optional onTap
+├── arc_usage_ring.dart         CustomPainter sweep-gradient progress arc
+├── weekly_stats_card.dart      Hero glass card with greeting + stats
+├── note_card.dart              Glass note tile + status-color edge accent
+├── empty_state.dart            Hero amber-on-navy mic disc + glass panel
+├── skeleton_note_card.dart     Glass skeleton matching note card shape
+└── pulsing_record_fab.dart     Amber→gold gradient pill + heartbeat halo
 ```
 
 ### Component recipes
 
-| Component          | Tokens consumed                                                                                                              | Notes                                                                                                                                       |
-| ------------------ | ---------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `HomeAppBar`       | `AppSpacing.sm`, M3 `colorScheme.onSurfaceVariant`                                                                           | Computes greeting via `TimeBasedGreeting.forTime`. Falls back to "Welcome to RecapCoach" if not signed in.                                  |
-| `UserAvatar`       | `AppColors.navy800` (bg), `AppColors.amber400` (initials)                                                                    | Avatar uses `foregroundImage: NetworkImage(photoUrl)` with the initials Text as the `child`, so a load failure naturally falls back.        |
-| `HomeEmptyState`   | `AppColors.navy800`, `AppColors.amber400`, `AppSpacing.huge`, `semantic.recordingPulse`, `semantic.shimmer`, `AppRadii.full` | The amber-on-navy mic disc gets a soft `recordingPulse`-tinted halo via a `BoxShadow`.                                                      |
-| `NoteCard`         | `cardTheme` (auto), `AppRadii.sm`, `AppSpacing.sm`                                                                           | Wraps `Card + InkWell` so tap feedback respects the elevation. Body text branches on `note.status`.                                         |
-| `NoteStatusChip`   | `semantic.usageMeterLow/Mid/High`, `AppRadii.xs`, `AppSpacing.xxs`                                                           | Reuses the usage-meter color ladder so "almost out" and "transcribing" share the amber tone — no new vocabulary.                            |
-| `UsageMeter`       | `semantic.usageMeterColorFor()`, `semantic.usageMeterTrack`, `semantic.proBadge`, `AppRadii.xs`, `AppSpacing.md`             | Bar is a gradient (65% alpha → full color) animated via `TweenAnimationBuilder` (700ms, easeOutCubic). Inline Upgrade CTA when free + ≥80%. |
-| `SkeletonNoteCard` | `semantic.shimmer`, `AppRadii.sm/xs`                                                                                         | Static (non-animated) skeleton; Hive opens fast enough that a real shimmer would barely register.                                           |
-| `PulsingRecordFab` | `semantic.recordingPulse`, `AppRadii.pill`                                                                                   | Pulse is a `BoxShadow` whose alpha + blur + spread are driven by an `AnimationController` repeating every 1.6s with `Curves.easeOut`.       |
+| Component                | Tokens consumed                                                                                                                      | Notes                                                                                                                                                                                                              |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `MeshGradientBackground` | `AppColors.navy700`, `AppColors.amber600/100`, `AppColors.sage700/300`, `AppColors.navy100`                                          | 3 radial blobs with sin/cos drift on 28s loop. `animate: false` flag for tests + low-power devices. Painter only repaints when `t` changes.                                                                        |
+| `GlassCard`              | `Colors.white` (mode-aware alpha), `Colors.black` / `AppColors.navy800` (drop shadow), `BackdropFilter` sigma 18 default             | Dark mode: 6% white fill, 10% white border. Light mode: 55% white fill, 70% white border. Optional `gradient` overlay paints between the blur and the child.                                                       |
+| `ArcUsageRing`           | Caller-supplied `color` + `trackColor`; uses `SweepGradient` (50% → full alpha)                                                      | Animated via `TweenAnimationBuilder` (800ms easeOutCubic). Center widget slot for the percentage label. Defensively clamps progress to [0, 1].                                                                     |
+| `WeeklyStatsCard`        | `AppColors.amber600/100`, `AppColors.ink900`, `AppColors.slate500`, `semantic.usageMeterColorFor()`, `AppSpacing.lg`                 | 34 pt display greeting, 3-stat row (count / minutes / arc-ring). Static helpers `firstName()` + `weeklyStats()` exposed for unit testing. Subtle warm gradient overlay in the top-left corner draws the eye first. |
+| `NoteCard`               | `GlassCard` (sigma 14, radius 18), `semantic.usageMeterLow/Mid/High`                                                                 | 4 dp leading status-color accent strip + status-tinted icon avatar (12 dp radius, 18% fill, 30% border). Body text branches on `note.status`.                                                                      |
+| `NoteStatusChip`         | `semantic.usageMeterLow/Mid/High`, `AppRadii.xs`                                                                                     | Unchanged from the M3 cut — works equally well on glass surfaces.                                                                                                                                                  |
+| `HomeEmptyState`         | `AppColors.navy900/700` (mic disc gradient), `AppColors.amber400/600` (halo + icon), `GlassCard`                                     | 132 dp mic disc has two stacked `BoxShadow` halos (36 dp blur + 80 dp blur) that bloom amber against the mesh. Glass panel below holds the headline + helper copy + "Start recording" pill.                        |
+| `SkeletonNoteCard`       | `GlassCard` (sigma 14), low-alpha block fills                                                                                        | Mode-aware block tints. Static (non-animated) — Hive opens in <300ms in practice.                                                                                                                                  |
+| `PulsingRecordFab`       | `AppColors.amber600 → amber400` linear gradient, `AppColors.amber400` halo, `AppColors.amber700` grounded shadow, white icon + label | Heartbeat halo: `AnimationController.repeat(1.6s)` drives a `BoxShadow` whose alpha (35→0%) + blur (14→32 dp) + spread (1→6 dp) co-vary on `Curves.easeOut`.                                                       |
+
+### Layout
+
+```
+┌────────────────────────────────────────────┐
+│ ░░░░░░░  animated mesh gradient ░░░░░░░░  │ ← Scaffold body
+│                                            │   (no AppBar)
+│  ╭──────── glass hero card ────────╮      │
+│  │ [avatar]              [⚙ icon] │      │
+│  │                                  │      │
+│  │ Good evening,                    │      │ ← 34 pt
+│  │ Ketan                            │      │   display
+│  │                                  │      │
+│  │  3       47        ◯ 40%         │      │
+│  │ recordings min     used          │      │
+│  ╰──────────────────────────────────╯      │
+│                                            │
+│  RECENT RECORDINGS                        │
+│  ╭────── glass note card ──────────╮      │
+│  │▌[icn] Title              [▸]   │      │
+│  │      [chip] 2:14                │      │
+│  │      Summary preview...          │      │
+│  ╰─────────────────────────────────╯      │
+│              ...                          │
+│                                            │
+│             ┌──────────────────┐          │
+│             │ 🎤 Record call   │ pulse    │ ← gradient FAB
+│             └──────────────────┘          │
+└────────────────────────────────────────────┘
+```
+
+The Scaffold uses no AppBar — the hero card occupies the top region.
+`Scaffold.backgroundColor` is transparent so the mesh is the actual
+background.
 
 ### Tests
 
-49 widget + unit tests added in Phase 1 (live alongside the 21 from
-Phase 0), in `test/features/home/widgets/`:
+63 widget + unit tests live in `test/features/home/widgets/`:
 
-- `time_based_greeting_test.dart` — 9 tests covering every hour boundary
-- `note_status_test.dart` — 7 tests covering precedence rules
-- `note_status_chip_test.dart` — 4 tests, one per status
-- `home_app_bar_test.dart` — 6 tests (greeting branches + welcome
-  fallback + settings callback + first-name parsing)
-- `user_avatar_test.dart` — 7 tests (initials matrix + photo branch)
-- `empty_state_test.dart` — 2 tests (smoke + dark theme)
-- `note_card_test.dart` — 5 tests (each status + onTap)
-- `usage_meter_test.dart` — 5 tests (free/pro × under/near/at-cap)
-- `pulsing_record_fab_test.dart` — 4 tests (smoke + tap + animation
-  cycle + clean dispose)
+| File                            | Tests | Coverage                                                            |
+| ------------------------------- | ----- | ------------------------------------------------------------------- |
+| `time_based_greeting_test.dart` | 9     | every hour boundary                                                 |
+| `note_status_test.dart`         | 7     | Note→status precedence rules                                        |
+| `note_status_chip_test.dart`    | 4     | one per status                                                      |
+| `user_avatar_test.dart`         | 7     | initials matrix + photo branch                                      |
+| `glass_card_test.dart`          | 5     | child reachable, light/dark, onTap, no spurious InkWell             |
+| `arc_usage_ring_test.dart`      | 5     | smoke, full progress, center slot, defensive clamp ±1.5/-0.3        |
+| `weekly_stats_card_test.dart`   | 15    | `firstName` (3) + `weeklyStats` (4) static helpers + 8 widget tests |
+| `note_card_test.dart`           | 5     | each status + onTap                                                 |
+| `empty_state_test.dart`         | 2     | smoke + dark theme                                                  |
+| `pulsing_record_fab_test.dart`  | 4     | smoke + tap + animation cycle + clean dispose                       |
 
-Total Phase 0 + Phase 1 design-system tests: **70**, plus 40
-monetization tests = **110 tests passing** as of this commit.
+**Total Phase 0 + Phase 1 design-system tests: 84.** Plus 40
+monetization tests = **124 tests passing** as of this commit.
 
 ```powershell
 flutter test test\core\theme\ test\features\home\
 ```
+
+### Performance notes
+
+- Each `GlassCard` instantiates its own `BackdropFilter`. On Impeller
+  (default on the user's Samsung S22), a list of 6-10 glass cards runs
+  at sustained 60 fps. If we ever drop below that on lower-end
+  devices, the first lever is dropping `sigma` from 18 → 12.
+- The mesh painter draws 3 radial gradients per frame at 60 fps. This
+  is a single large quad with shaders; cheap on Vulkan.
+- The hero card's animated arc-ring uses `TweenAnimationBuilder` so
+  it animates exactly once per change in progress, not every frame.
