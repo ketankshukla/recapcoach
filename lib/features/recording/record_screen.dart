@@ -10,6 +10,7 @@ import '../../core/logging/logger.dart';
 import '../../core/router/app_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
+import '../../core/widgets/glass/glass_alert_dialog.dart';
 import '../../core/widgets/glass/glass_icon_button.dart';
 import '../../core/widgets/glass/gradient_pill_button.dart';
 import '../home/widgets/glass_card.dart';
@@ -90,7 +91,7 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
     await showDialog<void>(
       context: context,
       barrierColor: Colors.black.withValues(alpha: 0.6),
-      builder: (ctx) => const _GlassAlertDialog(
+      builder: (ctx) => const GlassAlertDialog(
         title: 'Microphone access needed',
         message:
             'RecapCoach needs permission to use your microphone to record '
@@ -106,7 +107,7 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
     final upgrade = await showDialog<bool>(
       context: context,
       barrierColor: Colors.black.withValues(alpha: 0.6),
-      builder: (ctx) => _GlassAlertDialog(
+      builder: (ctx) => GlassAlertDialog(
         title: 'Free plan limit reached',
         message: "You've used $usedMin / $limitMin minutes this month "
             '(${usage.usedRecordings} of ${usage.limitRecordings} recordings).\n\n'
@@ -376,97 +377,3 @@ class _RecordingDot extends StatelessWidget {
   }
 }
 
-/// Glass-styled replacement for [AlertDialog].
-///
-/// Sits over the same mesh-blurred barrier the rest of the screen
-/// already uses; the dialog itself is a centered `GlassCard` with a
-/// title, message, and one or two action buttons. The primary action
-/// uses the amber `GradientPillButton`, the secondary is a low-key
-/// glass pill that pops `secondaryReturn`.
-///
-/// Returns the value associated with whichever button was tapped, or
-/// `null` if dismissed via tap-outside.
-class _GlassAlertDialog extends StatelessWidget {
-  const _GlassAlertDialog({
-    required this.title,
-    required this.message,
-    required this.primaryLabel,
-    this.secondaryLabel,
-    this.primaryReturn,
-    this.secondaryReturn,
-  });
-
-  final String title;
-  final String message;
-  final String primaryLabel;
-  final String? secondaryLabel;
-  final Object? primaryReturn;
-  final Object? secondaryReturn;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final fg = isDark ? const Color(0xFFF7F4EE) : AppColors.ink900;
-    final fgMuted =
-        isDark ? const Color(0xFFD8D4CB) : AppColors.slate500;
-    return Dialog(
-      backgroundColor: Colors.transparent,
-      elevation: 0,
-      insetPadding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.lg,
-      ),
-      child: GlassCard(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        radius: 22,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              title,
-              style: theme.textTheme.titleLarge?.copyWith(
-                color: fg,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              message,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: fgMuted,
-                height: 1.4,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            if (secondaryLabel != null) ...[
-              GradientPillButton(
-                onPressed: () =>
-                    Navigator.of(context).pop(primaryReturn ?? true),
-                label: primaryLabel,
-                expanded: true,
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              TextButton(
-                onPressed: () =>
-                    Navigator.of(context).pop(secondaryReturn ?? false),
-                child: Text(
-                  secondaryLabel!,
-                  style: TextStyle(
-                    color: fgMuted,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ] else
-              GradientPillButton(
-                onPressed: () => Navigator.of(context).pop(),
-                label: primaryLabel,
-                expanded: true,
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}

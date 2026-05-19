@@ -507,11 +507,12 @@ used by 2+ screens. The home screen's `GlassCard` and
 `MeshGradientBackground` will eventually move here too once they earn
 a second consumer.
 
-| Primitive            | File                                               | Used by                                                                                                      |
-| -------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `GradientPillButton` | `lib/core/widgets/glass/gradient_pill_button.dart` | Paywall ("Start free trial"), Record ("Stop & save"), `_GlassAlertDialog` primary action, future Sign In CTA |
-| `GlassIconButton`    | `lib/core/widgets/glass/glass_icon_button.dart`    | Paywall close, Record cancel, Record discard (red `tint:`), future Settings back                             |
-| `GlassPillButton`    | `lib/core/widgets/glass/glass_pill_button.dart`    | Paywall "Restore" link; the low-key sibling of `GradientPillButton`                                          |
+| Primitive            | File                                               | Used by                                                                                                                                                |
+| -------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `GradientPillButton` | `lib/core/widgets/glass/gradient_pill_button.dart` | Paywall ("Start free trial"), Record ("Stop & save"), `GlassAlertDialog` non-destructive primary action, future Sign In CTA                            |
+| `GlassIconButton`    | `lib/core/widgets/glass/glass_icon_button.dart`    | Paywall close, Record cancel + discard (red `tint:`), Settings back                                                                                    |
+| `GlassPillButton`    | `lib/core/widgets/glass/glass_pill_button.dart`    | Paywall "Restore" link; the low-key sibling of `GradientPillButton`                                                                                    |
+| `GlassAlertDialog`   | `lib/core/widgets/glass/glass_alert_dialog.dart`   | Record (mic permission, free-cap reached), Settings (delete-account confirmation). `primaryDestructive: true` swaps amber CTA for red outlined button. |
 
 `GradientPillButton` is the same amber-600 → amber-400 gradient pill
 as `PulsingRecordFab` minus the heartbeat halo. Idle / loading /
@@ -582,10 +583,37 @@ Structural changes from the M3 version:
 - **Action row.** A red-tinted `GlassIconButton` (Discard) + an
   expanded `GradientPillButton` ("Stop & save"). The previous Material
   `_CircleButton` is gone.
-- **`_GlassAlertDialog`.** Replaces Material `AlertDialog` for the
-  permission-needed and quota-reached prompts. Uses the same
-  `GlassCard` surface + `GradientPillButton` primary action so the
-  dialog feels like part of the same screen rather than a M3 popup.
+- **`GlassAlertDialog`.** Replaces Material `AlertDialog` for the
+  permission-needed and quota-reached prompts. Lives in
+  `lib/core/widgets/glass/` (extracted in commit 4) so Settings can
+  reuse it.
+
+### Settings (`lib/features/settings/settings_screen.dart`)
+
+Third non-home screen on the glass theme. Replaces a flat
+`ListView`-of-`ListTile`s with mesh-backed sections, each section a
+`GlassCard` containing semantically-grouped rows.
+
+- **No AppBar.** Back is a floating `GlassIconButton` in the top-left.
+- **Sits over `MeshGradientBackground`** (same as home / paywall / record).
+- **Display title.** "Settings" rendered as a 32 dp display heading
+  inside the scrollable content rather than a stock app-bar title.
+- **Sections.** Four `GlassCard`s, each with a small all-caps muted
+  `_SectionLabel` above ("ACCOUNT", "SUBSCRIPTION",
+  "LEGAL & SUPPORT", "ACCOUNT ACTIONS"). Helps the eye scan the
+  screen without reading every row.
+- **`_SettingsRow` private widget.** Looks like a `ListTile` but is
+  hand-rolled so the divider colour, ripple shape, icon tint, and
+  destructive title tint can match the glass surface. Last row in
+  each card sets `showDivider: false` so the card doesn't draw a
+  divider against its own bottom border.
+- **Pro tile.** Amber `workspace_premium` icon when the user is on
+  Pro; lock-outline when on Free. Tap routes to the Play Store
+  subscription manager (Pro) or `/paywall` (Free).
+- **Delete account.** Uses the shared `GlassAlertDialog` with
+  `primaryDestructive: true`, which swaps the amber CTA for a red
+  outlined button -- destructive actions never sit in the visual
+  slot the brain associates with "good".
 
 ### Tests
 
