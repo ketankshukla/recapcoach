@@ -63,6 +63,7 @@ This snapshot reflects the state of `main` after the **UI overhaul Phase 1 — H
 - **Hero stats card now reads server-backed monthly usage** (was: weekly Hive counts). Numbers on the card match the caps the server enforces, eliminating the "19 recordings this week / 5 of 5 cap reached this month" inconsistency.
 - **Developer quota bypass** — debug builds and any UID listed in `/config/global.developerUids` skip every cap check on both the client (`lib/core/config/developer.dart`) and the server (`api/_lib/quota.ts`). Cap dialogs, paywall pre-flight, and the usage meter all short-circuit. The hero card renders DEV / unlimited instead of percent-used (chapter 09 § Developer bypass).
 - **Paywall hang fixed** — empty RevenueCat package list (stub mode in dev) now renders a stub picker instead of spinning forever (`lib/features/paywall/paywall_screen.dart`).
-- 136 unit + widget tests passing (40 monetization + 21 design system Phase 0 + 75 home Phase 1+).
+- **Phase 2 glass theme rollout — Paywall shipped** — paywall now sits over the same `MeshGradientBackground`, hero amber medal disc + glass benefits card + glass product tiles + amber-gradient `BEST VALUE` badge + new shared `GradientPillButton` CTA. No `AppBar` — close + Restore are floating glass controls in the corners. (chapter 13 § 12).
+- 141 unit + widget tests passing (Phase 1 + Phase 2 + monetization + quota / dev bypass).
 
 Update this doc when you ship the next significant milestone (UI Phase 2 record screen, RevenueCat product wiring, Play Store closed testing, etc.).

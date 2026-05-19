@@ -459,24 +459,25 @@ background.
 
 63 widget + unit tests live in `test/features/home/widgets/`:
 
-| File                            | Tests | Coverage                                                            |
-| ------------------------------- | ----- | ------------------------------------------------------------------- |
-| `time_based_greeting_test.dart` | 9     | every hour boundary                                                 |
-| `note_status_test.dart`         | 7     | Note→status precedence rules                                        |
-| `note_status_chip_test.dart`    | 4     | one per status                                                      |
-| `user_avatar_test.dart`         | 7     | initials matrix + photo branch                                      |
-| `glass_card_test.dart`          | 5     | child reachable, light/dark, onTap, no spurious InkWell             |
-| `arc_usage_ring_test.dart`      | 5     | smoke, full progress, center slot, defensive clamp ±1.5/-0.3        |
-| `weekly_stats_card_test.dart`   | 15    | `firstName` (3) + `weeklyStats` (4) static helpers + 8 widget tests |
-| `note_card_test.dart`           | 5     | each status + onTap                                                 |
-| `empty_state_test.dart`         | 2     | smoke + dark theme                                                  |
-| `pulsing_record_fab_test.dart`  | 4     | smoke + tap + animation cycle + clean dispose                       |
+| File                            | Tests | Coverage                                                          |
+| ------------------------------- | ----- | ----------------------------------------------------------------- |
+| `time_based_greeting_test.dart` | 9     | every hour boundary                                               |
+| `note_status_test.dart`         | 7     | Note→status precedence rules                                      |
+| `note_status_chip_test.dart`    | 4     | one per status                                                    |
+| `user_avatar_test.dart`         | 7     | initials matrix + photo branch                                    |
+| `glass_card_test.dart`          | 5     | child reachable, light/dark, onTap, no spurious InkWell           |
+| `arc_usage_ring_test.dart`      | 5     | smoke, full progress, center slot, defensive clamp ±1.5/-0.3      |
+| `weekly_stats_card_test.dart`   | 12    | `firstName` (3) static helper + 9 widget tests (incl. dev bypass) |
+| `note_card_test.dart`           | 5     | each status + onTap                                               |
+| `empty_state_test.dart`         | 2     | smoke + dark theme                                                |
+| `pulsing_record_fab_test.dart`  | 4     | smoke + tap + animation cycle + clean dispose                     |
 
-**Total Phase 0 + Phase 1 design-system tests: 84.** Plus 40
-monetization tests = **124 tests passing** as of this commit.
+**Total: 141 tests passing as of this commit** (Phase 0 + Phase 1
+design-system + 40 monetization + quota / dev-bypass + Phase 2
+`GradientPillButton`).
 
 ```powershell
-flutter test test\core\theme\ test\features\home\
+flutter test test\core\ test\features\home\
 ```
 
 ### Performance notes
@@ -489,3 +490,79 @@ flutter test test\core\theme\ test\features\home\
   is a single large quad with shaders; cheap on Vulkan.
 - The hero card's animated arc-ring uses `TweenAnimationBuilder` so
   it animates exactly once per change in progress, not every frame.
+
+---
+
+## 12. Phase 2 — Glass theme rollout to remaining screens
+
+Phase 1 proved the glass-dashboard direction on the home screen. Phase
+2 propagates the same vocabulary across every other screen so the app
+feels like a single coherent product rather than "the home screen plus
+a Material 3 settings page."
+
+### Shared primitives
+
+A new shared widgets folder, `lib/core/widgets/glass/`, holds primitives
+used by 2+ screens. The home screen's `GlassCard` and
+`MeshGradientBackground` will eventually move here too once they earn
+a second consumer.
+
+| Primitive            | File                                               | Used by                               |
+| -------------------- | -------------------------------------------------- | ------------------------------------- |
+| `GradientPillButton` | `lib/core/widgets/glass/gradient_pill_button.dart` | Paywall (CTA), Sign In, Record (next) |
+
+`GradientPillButton` is the same amber-600 → amber-400 gradient pill
+as `PulsingRecordFab` minus the heartbeat halo. Idle / loading /
+disabled states share a single API:
+
+```dart
+GradientPillButton(
+  onPressed: _selected == null ? null : _buy,
+  loading: _purchasing,
+  expanded: true,                   // stretches to fill width
+  icon: Icons.workspace_premium_rounded,
+  label: 'Start free trial',
+)
+```
+
+In loading state the label is replaced with a 22 dp white spinner and
+taps are swallowed even when `onPressed` is non-null — the Paywall
+calls `purchasePackage()` async and a double-tap would charge the
+user twice (this is locked down by a [CRITICAL] widget test).
+
+### Paywall (`lib/features/paywall/paywall_screen.dart`)
+
+First non-home screen on the glass theme. Sits over the same
+`MeshGradientBackground` so the upgrade flow feels continuous with the
+home screen. Structural changes from the M3 version:
+
+- **No AppBar.** Close + Restore are floating glass controls in the
+  top corners (`_GlassIconButton`, `_GlassPillButton`).
+- **Hero medal disc.** 96 dp amber-gradient circle with a 32 dp amber
+  bloom shadow replaces the flat `Icon(Icons.workspace_premium, size: 64)`.
+- **Glass benefits card.** A single `GlassCard` holds 4 benefit rows;
+  each row uses a 26 dp amber-gradient check disc instead of the
+  Material `Icons.check_circle`.
+- **Glass product tiles.** Each RevenueCat package is a `GlassCard`
+  with a custom amber-when-selected radio + `BEST VALUE` gradient
+  badge for the annual plan. Selected state tints the card with 12 %
+  amber instead of swapping to a primary-color background.
+- **Stub product tile.** Empty offerings (RevenueCat in stub mode)
+  render an explanatory `GlassCard` instead of bricking the screen
+  with a null-pointer dereference (the bug fixed in commit `7742178`).
+- **Error chip.** Errors render as an inline error-tinted glass-style
+  chip rather than red text under the button.
+- **Primary CTA** is the new `GradientPillButton` so the Paywall's
+  "Start free trial" matches the home screen's "Record call" pill.
+
+### Tests
+
+| File                                                     | Tests | Coverage                                                                              |
+| -------------------------------------------------------- | ----- | ------------------------------------------------------------------------------------- |
+| `test/core/widgets/glass/gradient_pill_button_test.dart` | 5     | idle / loading (CRITICAL: tap-swallow) / disabled / no-icon / dark-theme builds clean |
+
+Paywall screen itself is not yet covered by a widget test because it
+reaches into Firebase Analytics + RevenueCat statics during init; we'd
+need to refactor `Analytics` and `PurchasesService` for full
+testability first. The hang fix in commit `7742178` is exercised end
+-to-end in dev (stub mode == empty offerings == stub tile renders).
