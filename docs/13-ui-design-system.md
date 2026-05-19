@@ -472,9 +472,9 @@ background.
 | `empty_state_test.dart`         | 2     | smoke + dark theme                                                |
 | `pulsing_record_fab_test.dart`  | 4     | smoke + tap + animation cycle + clean dispose                     |
 
-**Total: 141 tests passing as of this commit** (Phase 0 + Phase 1
-design-system + 40 monetization + quota / dev-bypass + Phase 2
-`GradientPillButton`).
+**Total: 156 tests passing as of this commit** (Phase 0 + Phase 1
+design-system + 40 monetization + quota / dev-bypass + Phase 2 shared
+primitives + Record screen widgets).
 
 ```powershell
 flutter test test\core\ test\features\home\
@@ -507,9 +507,11 @@ used by 2+ screens. The home screen's `GlassCard` and
 `MeshGradientBackground` will eventually move here too once they earn
 a second consumer.
 
-| Primitive            | File                                               | Used by                               |
-| -------------------- | -------------------------------------------------- | ------------------------------------- |
-| `GradientPillButton` | `lib/core/widgets/glass/gradient_pill_button.dart` | Paywall (CTA), Sign In, Record (next) |
+| Primitive            | File                                               | Used by                                                                                                      |
+| -------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `GradientPillButton` | `lib/core/widgets/glass/gradient_pill_button.dart` | Paywall ("Start free trial"), Record ("Stop & save"), `_GlassAlertDialog` primary action, future Sign In CTA |
+| `GlassIconButton`    | `lib/core/widgets/glass/glass_icon_button.dart`    | Paywall close, Record cancel, Record discard (red `tint:`), future Settings back                             |
+| `GlassPillButton`    | `lib/core/widgets/glass/glass_pill_button.dart`    | Paywall "Restore" link; the low-key sibling of `GradientPillButton`                                          |
 
 `GradientPillButton` is the same amber-600 → amber-400 gradient pill
 as `PulsingRecordFab` minus the heartbeat halo. Idle / loading /
@@ -555,14 +557,53 @@ home screen. Structural changes from the M3 version:
 - **Primary CTA** is the new `GradientPillButton` so the Paywall's
   "Start free trial" matches the home screen's "Record call" pill.
 
+### Record screen (`lib/features/recording/record_screen.dart`)
+
+Second non-home screen on the glass theme. The recording "moment of
+truth" feels like the same product as the home screen instead of a
+Material 3 detour.
+
+Structural changes from the M3 version:
+
+- **No AppBar.** Cancel is a floating `GlassIconButton` in the top-left
+  corner. Pressing the device back-button calls the same `_cancel()`
+  flow via `PopScope`.
+- **Sits over `MeshGradientBackground`** (same animated mesh as home + paywall).
+- **`AmplitudePulseMic`** -- new widget in `lib/features/recording/widgets/`.
+  140-200 dp amber-gradient mic disc with two stacked `BoxShadow` halos
+  whose alpha + blur + spread are all driven by the live amplitude.
+  Replaces the previous M3 `primaryContainer` circle.
+- **Glass timer card.** Elapsed time + status sub-label live inside a
+  `GlassCard` with a small `_RecordingDot` (red while recording, dim
+  while preparing) so the user always knows the recorder's state.
+- **`AmplitudeWaveform`** -- 20 bars; lit ones use the amber gradient,
+  unlit use a low-alpha white (dark) / slate (light). Replaces the
+  previous M3 primary-coloured bars.
+- **Action row.** A red-tinted `GlassIconButton` (Discard) + an
+  expanded `GradientPillButton` ("Stop & save"). The previous Material
+  `_CircleButton` is gone.
+- **`_GlassAlertDialog`.** Replaces Material `AlertDialog` for the
+  permission-needed and quota-reached prompts. Uses the same
+  `GlassCard` surface + `GradientPillButton` primary action so the
+  dialog feels like part of the same screen rather than a M3 popup.
+
 ### Tests
 
-| File                                                     | Tests | Coverage                                                                              |
-| -------------------------------------------------------- | ----- | ------------------------------------------------------------------------------------- |
-| `test/core/widgets/glass/gradient_pill_button_test.dart` | 5     | idle / loading (CRITICAL: tap-swallow) / disabled / no-icon / dark-theme builds clean |
+| File                                                            | Tests | Coverage                                                                              |
+| --------------------------------------------------------------- | ----- | ------------------------------------------------------------------------------------- |
+| `test/core/widgets/glass/gradient_pill_button_test.dart`        | 5     | idle / loading (CRITICAL: tap-swallow) / disabled / no-icon / dark-theme builds clean |
+| `test/core/widgets/glass/glass_icon_button_test.dart`           | 4     | renders + onPressed / custom tint / dark-mode default fg / both themes build clean    |
+| `test/core/widgets/glass/glass_pill_button_test.dart`           | 3     | label + onPressed / optional icon + tint / dark-theme builds clean                    |
+| `test/features/recording/widgets/amplitude_pulse_mic_test.dart` | 4     | silence smoke / loud > quiet size / defensive amplitude clamp / dark-theme builds     |
+| `test/features/recording/widgets/amplitude_waveform_test.dart`  | 4     | default 20 bars / custom barCount / defensive amplitude clamp / dark-theme builds     |
 
-Paywall screen itself is not yet covered by a widget test because it
-reaches into Firebase Analytics + RevenueCat statics during init; we'd
-need to refactor `Analytics` and `PurchasesService` for full
-testability first. The hang fix in commit `7742178` is exercised end
--to-end in dev (stub mode == empty offerings == stub tile renders).
+Paywall + Record screens themselves are not yet covered by widget
+tests because they reach into Firebase Analytics + RevenueCat +
+record-package statics during init; we'd need to refactor `Analytics`,
+`PurchasesService`, and `AudioRecorderService` for full testability
+first. The hang fix in commit `7742178` is exercised end-to-end in
+dev (stub mode == empty offerings == stub tile renders).
+
+```powershell
+flutter test test\core\ test\features\recording\
+```

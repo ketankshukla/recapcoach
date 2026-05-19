@@ -79,9 +79,9 @@ void main() {
     testWidgets('Disabled state (onPressed == null): no taps land',
         (tester) async {
       // `taps` is never incremented because `onPressed` is null; we
-      // declare it `final` to make the intent explicit (we want to
-      // assert it stays at zero).
-      final taps = 0;
+      // declare it `const` so the analyzer treats it as a true
+      // compile-time constant (we want to assert it stays at zero).
+      const taps = 0;
       await _pump(
         tester,
         button: const GradientPillButton(

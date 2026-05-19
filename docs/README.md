@@ -63,7 +63,10 @@ This snapshot reflects the state of `main` after the **UI overhaul Phase 1 — H
 - **Hero stats card now reads server-backed monthly usage** (was: weekly Hive counts). Numbers on the card match the caps the server enforces, eliminating the "19 recordings this week / 5 of 5 cap reached this month" inconsistency.
 - **Developer quota bypass** — debug builds and any UID listed in `/config/global.developerUids` skip every cap check on both the client (`lib/core/config/developer.dart`) and the server (`api/_lib/quota.ts`). Cap dialogs, paywall pre-flight, and the usage meter all short-circuit. The hero card renders DEV / unlimited instead of percent-used (chapter 09 § Developer bypass).
 - **Paywall hang fixed** — empty RevenueCat package list (stub mode in dev) now renders a stub picker instead of spinning forever (`lib/features/paywall/paywall_screen.dart`).
-- **Phase 2 glass theme rollout — Paywall shipped** — paywall now sits over the same `MeshGradientBackground`, hero amber medal disc + glass benefits card + glass product tiles + amber-gradient `BEST VALUE` badge + new shared `GradientPillButton` CTA. No `AppBar` — close + Restore are floating glass controls in the corners. (chapter 13 § 12).
-- 141 unit + widget tests passing (Phase 1 + Phase 2 + monetization + quota / dev bypass).
+- **Phase 2 glass theme rollout — Paywall + Record shipped.**
+  - Paywall sits over `MeshGradientBackground` with hero amber medal disc, glass benefits card, glass product tiles, amber-gradient `BEST VALUE` badge, and the new shared `GradientPillButton` CTA. No `AppBar` — close + Restore are floating glass controls.
+  - Record screen sits over the same mesh: amber-gradient `AmplitudePulseMic` with halos that breathe with live amplitude, glass timer card with a recording dot, amber-gradient `AmplitudeWaveform`, red-tinted `GlassIconButton` for discard + `GradientPillButton` for Stop & save, and a glass alert dialog for permission / quota prompts (chapter 13 § 12).
+- Three new shared primitives in `lib/core/widgets/glass/`: `GradientPillButton`, `GlassIconButton`, `GlassPillButton`. Two new recording widgets in `lib/features/recording/widgets/`: `AmplitudePulseMic`, `AmplitudeWaveform`.
+- 156 unit + widget tests passing (Phase 1 + Phase 2 + monetization + quota / dev bypass).
 
 Update this doc when you ship the next significant milestone (UI Phase 2 record screen, RevenueCat product wiring, Play Store closed testing, etc.).

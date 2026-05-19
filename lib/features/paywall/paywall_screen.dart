@@ -8,6 +8,8 @@ import '../../core/analytics/analytics.dart';
 import '../../core/config/env.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
+import '../../core/widgets/glass/glass_icon_button.dart';
+import '../../core/widgets/glass/glass_pill_button.dart';
 import '../../core/widgets/glass/gradient_pill_button.dart';
 import '../home/widgets/glass_card.dart';
 import '../home/widgets/mesh_gradient_background.dart';
@@ -229,7 +231,7 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
               Positioned(
                 top: AppSpacing.sm,
                 left: AppSpacing.sm,
-                child: _GlassIconButton(
+                child: GlassIconButton(
                   icon: Icons.close_rounded,
                   tooltip: 'Close',
                   onPressed: () => context.pop(),
@@ -238,78 +240,13 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
               Positioned(
                 top: AppSpacing.sm,
                 right: AppSpacing.sm,
-                child: _GlassPillButton(
+                child: GlassPillButton(
                   label: 'Restore',
                   onPressed: _restore,
                 ),
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-// =============================================================================
-// Floating top controls
-// =============================================================================
-
-class _GlassIconButton extends StatelessWidget {
-  const _GlassIconButton({
-    required this.icon,
-    required this.onPressed,
-    this.tooltip,
-  });
-
-  final IconData icon;
-  final VoidCallback onPressed;
-  final String? tooltip;
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final fg = isDark ? const Color(0xFFF7F4EE) : AppColors.ink900;
-    return GlassCard(
-      padding: EdgeInsets.zero,
-      radius: 14,
-      onTap: onPressed,
-      child: SizedBox(
-        height: 44,
-        width: 44,
-        child: Tooltip(
-          message: tooltip ?? '',
-          child: Icon(icon, color: fg, size: 22),
-        ),
-      ),
-    );
-  }
-}
-
-class _GlassPillButton extends StatelessWidget {
-  const _GlassPillButton({required this.label, required this.onPressed});
-
-  final String label;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final fg = isDark ? const Color(0xFFF7F4EE) : AppColors.ink900;
-    return GlassCard(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.md,
-        vertical: 10,
-      ),
-      radius: 22,
-      onTap: onPressed,
-      child: Text(
-        label,
-        style: TextStyle(
-          color: fg,
-          fontWeight: FontWeight.w600,
-          fontSize: 14,
-          letterSpacing: 0.2,
         ),
       ),
     );

@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,6 +8,12 @@ import 'package:uuid/uuid.dart';
 
 import '../../core/logging/logger.dart';
 import '../../core/router/app_router.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_spacing.dart';
+import '../../core/widgets/glass/glass_icon_button.dart';
+import '../../core/widgets/glass/gradient_pill_button.dart';
+import '../home/widgets/glass_card.dart';
+import '../home/widgets/mesh_gradient_background.dart';
 import '../notes/note.dart';
 import '../notes/note_providers.dart';
 import '../notes/note_repository.dart';
@@ -17,7 +22,24 @@ import '../transcription/transcription_service.dart';
 import '../usage/usage.dart';
 import '../usage/usage_provider.dart';
 import 'recording_providers.dart';
+import 'widgets/amplitude_pulse_mic.dart';
+import 'widgets/amplitude_waveform.dart';
 
+/// Glass-themed recording screen.
+///
+/// Mesh-gradient backdrop matches the home + paywall so the recording
+/// "moment of truth" feels like the same product. Layout (top to
+/// bottom):
+///
+///  1. Floating glass cancel `X` in the top-left corner. No `AppBar`.
+///  2. Hero amber-on-glass `AmplitudePulseMic` sized 140-200 dp,
+///     halos pulsing with live dBFS.
+///  3. `GlassCard` holding the elapsed-time timer (mono digits) and
+///     a status sub-label ("Recording…" / "Preparing…").
+///  4. `AmplitudeWaveform` -- 20 amber-gradient bars driven by the
+///     same loudness signal.
+///  5. Bottom action row: glass discard pill + amber `GradientPillButton`
+///     "Stop & save".
 class RecordScreen extends ConsumerStatefulWidget {
   const RecordScreen({super.key});
 
@@ -59,54 +81,49 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
     final ok = await ref.read(recordingControllerProvider.notifier).start();
     if (!mounted) return;
     if (!ok) {
-      await showDialog<void>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Microphone access needed'),
-          content: const Text(
-            'RecapCoach needs permission to use your microphone to record calls. '
-            'Please grant access in Settings and try again.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('OK'),
-            ),
-          ],
-        ),
-      );
+      await _showPermissionDialog();
       if (mounted) context.pop();
     }
+  }
+
+  Future<void> _showPermissionDialog() async {
+    await showDialog<void>(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.6),
+      builder: (ctx) => const _GlassAlertDialog(
+        title: 'Microphone access needed',
+        message:
+            'RecapCoach needs permission to use your microphone to record '
+            'calls. Please grant access in Settings and try again.',
+        primaryLabel: 'OK',
+      ),
+    );
   }
 
   Future<void> _showQuotaDialog(UsageSnapshot usage) async {
     final usedMin = (usage.usedSeconds / 60).toStringAsFixed(0);
     final limitMin = (usage.limitSeconds / 60).toStringAsFixed(0);
-    await showDialog<void>(
+    final upgrade = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Free plan limit reached'),
-        content: Text(
-          'You\'ve used $usedMin / $limitMin minutes this month '
-          '(${usage.usedRecordings} of ${usage.limitRecordings} recordings).\n\n'
-          'Upgrade to Pro to keep recording — 8 hours and 100 recordings every month.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Not now'),
-          ),
-          FilledButton(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              context.pushReplacement(AppRoutes.paywall);
-            },
-            child: const Text('Upgrade'),
-          ),
-        ],
+      barrierColor: Colors.black.withValues(alpha: 0.6),
+      builder: (ctx) => _GlassAlertDialog(
+        title: 'Free plan limit reached',
+        message: "You've used $usedMin / $limitMin minutes this month "
+            '(${usage.usedRecordings} of ${usage.limitRecordings} recordings).\n\n'
+            'Upgrade to Pro to keep recording — 8 hours and 100 recordings '
+            'every month.',
+        primaryLabel: 'Upgrade',
+        secondaryLabel: 'Not now',
+        primaryReturn: true,
+        secondaryReturn: false,
       ),
     );
-    if (mounted) context.pop();
+    if (!mounted) return;
+    if (upgrade == true) {
+      context.pushReplacement(AppRoutes.paywall);
+    } else {
+      context.pop();
+    }
   }
 
   Future<void> _stopAndSave() async {
@@ -197,7 +214,11 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(recordingControllerProvider);
-    final scheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final fg = isDark ? const Color(0xFFF7F4EE) : AppColors.ink900;
+    final fgMuted =
+        isDark ? const Color(0xFFD8D4CB) : AppColors.slate500;
 
     return PopScope(
       canPop: false,
@@ -206,60 +227,114 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
         await _cancel();
       },
       child: Scaffold(
-        backgroundColor: scheme.surface,
-        appBar: AppBar(
-          title: const Text('Recording'),
-          leading: IconButton(
-            icon: const Icon(Icons.close),
-            onPressed: _cancel,
-            tooltip: 'Cancel',
-          ),
-        ),
-        body: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
+        backgroundColor: Colors.transparent,
+        body: MeshGradientBackground(
+          child: SafeArea(
+            child: Stack(
               children: [
-                const Spacer(),
-                _PulsingMic(amplitudeDb: state.amplitudeDb),
-                const SizedBox(height: 32),
-                Text(
-                  state.elapsedLabel,
-                  style: Theme.of(context).textTheme.displayMedium?.copyWith(
-                        fontFeatures: const [FontFeature.tabularFigures()],
-                        fontWeight: FontWeight.w600,
+                // Floating cancel control in the top-left corner.
+                Positioned(
+                  top: AppSpacing.sm,
+                  left: AppSpacing.sm,
+                  child: GlassIconButton(
+                    icon: Icons.close_rounded,
+                    tooltip: 'Cancel',
+                    onPressed: _cancel,
+                  ),
+                ),
+
+                // Main column.
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.lg,
+                    72,
+                    AppSpacing.lg,
+                    AppSpacing.lg,
+                  ),
+                  child: Column(
+                    children: [
+                      const Spacer(),
+                      AmplitudePulseMic(amplitudeDb: state.amplitudeDb),
+                      const SizedBox(height: AppSpacing.xl),
+
+                      // Glass card wrapping the elapsed timer + status copy.
+                      GlassCard(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.xl,
+                          vertical: AppSpacing.md,
+                        ),
+                        radius: 22,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              state.elapsedLabel,
+                              style:
+                                  theme.textTheme.displayMedium?.copyWith(
+                                color: fg,
+                                fontFeatures: const [
+                                  FontFeature.tabularFigures(),
+                                ],
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: -0.5,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                _RecordingDot(active: state.isRecording),
+                                const SizedBox(width: 6),
+                                Text(
+                                  state.isRecording
+                                      ? 'Recording…'
+                                      : 'Preparing…',
+                                  style: theme.textTheme.labelMedium
+                                      ?.copyWith(
+                                    color: fgMuted,
+                                    fontWeight: FontWeight.w500,
+                                    letterSpacing: 0.4,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
+
+                      const Spacer(),
+                      AmplitudeWaveform(amplitudeDb: state.amplitudeDb),
+                      const SizedBox(height: AppSpacing.xl),
+
+                      // Bottom action row.
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          GlassIconButton(
+                            icon: Icons.delete_outline_rounded,
+                            tooltip: 'Discard',
+                            tint: AppColors.error600,
+                            size: 56,
+                            iconSize: 26,
+                            radius: 28,
+                            onPressed: _cancel,
+                          ),
+                          const SizedBox(width: AppSpacing.md),
+                          Expanded(
+                            child: GradientPillButton(
+                              onPressed: _stopAndSave,
+                              icon: Icons.stop_rounded,
+                              label: 'Stop & save',
+                              expanded: true,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  state.isRecording ? 'Recording…' : 'Preparing…',
-                  style: TextStyle(color: scheme.onSurfaceVariant),
-                ),
-                const Spacer(),
-                _AmplitudeBar(amplitudeDb: state.amplitudeDb),
-                const SizedBox(height: 32),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    _CircleButton(
-                      icon: Icons.delete_outline,
-                      label: 'Discard',
-                      color: scheme.errorContainer,
-                      iconColor: scheme.onErrorContainer,
-                      onTap: _cancel,
-                    ),
-                    _CircleButton(
-                      icon: Icons.stop_rounded,
-                      label: 'Stop & save',
-                      color: scheme.primary,
-                      iconColor: scheme.onPrimary,
-                      large: true,
-                      onTap: _stopAndSave,
-                    ),
-                    const SizedBox(width: 64), // spacer for symmetry
-                  ],
-                ),
-                const SizedBox(height: 16),
               ],
             ),
           ),
@@ -269,118 +344,129 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
   }
 }
 
-class _PulsingMic extends StatelessWidget {
-  const _PulsingMic({required this.amplitudeDb});
+/// Small red dot that turns from solid red while recording to muted
+/// grey while preparing. Sits next to the "Recording…" / "Preparing…"
+/// label inside the timer card.
+class _RecordingDot extends StatelessWidget {
+  const _RecordingDot({required this.active});
 
-  final double amplitudeDb;
+  final bool active;
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    // amplitudeDb roughly ranges from -60 (quiet) to 0 (loud).
-    final loudness = ((amplitudeDb.clamp(-60.0, 0.0)) + 60) / 60; // 0..1
-    final size = 120.0 + (loudness * 60.0);
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 120),
-      width: size,
-      height: size,
+    return Container(
+      height: 8,
+      width: 8,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: scheme.primaryContainer.withValues(alpha: 0.6),
-        boxShadow: [
-          BoxShadow(
-            color: scheme.primary.withValues(alpha: 0.25 + loudness * 0.4),
-            blurRadius: 32,
-            spreadRadius: loudness * 12,
-          ),
-        ],
-      ),
-      alignment: Alignment.center,
-      child: Icon(
-        Icons.mic,
-        size: 48,
-        color: scheme.onPrimaryContainer,
+        color: active
+            ? AppColors.error600
+            : AppColors.slate400.withValues(alpha: 0.6),
+        boxShadow: active
+            ? [
+                BoxShadow(
+                  color: AppColors.error600.withValues(alpha: 0.5),
+                  blurRadius: 6,
+                  spreadRadius: 1,
+                ),
+              ]
+            : null,
       ),
     );
   }
 }
 
-class _AmplitudeBar extends StatelessWidget {
-  const _AmplitudeBar({required this.amplitudeDb});
-
-  final double amplitudeDb;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final loudness = ((amplitudeDb.clamp(-60.0, 0.0)) + 60) / 60;
-    return SizedBox(
-      height: 28,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: List.generate(20, (i) {
-          final threshold = (i + 1) / 20;
-          final lit = threshold <= loudness;
-          final h = 8.0 + (math.sin(i * 0.6) + 1) * 8.0;
-          return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 2),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 150),
-              width: 6,
-              height: h,
-              decoration: BoxDecoration(
-                color: lit
-                    ? scheme.primary
-                    : scheme.outlineVariant.withValues(alpha: 0.5),
-                borderRadius: BorderRadius.circular(3),
-              ),
-            ),
-          );
-        }),
-      ),
-    );
-  }
-}
-
-class _CircleButton extends StatelessWidget {
-  const _CircleButton({
-    required this.icon,
-    required this.label,
-    required this.color,
-    required this.iconColor,
-    required this.onTap,
-    this.large = false,
+/// Glass-styled replacement for [AlertDialog].
+///
+/// Sits over the same mesh-blurred barrier the rest of the screen
+/// already uses; the dialog itself is a centered `GlassCard` with a
+/// title, message, and one or two action buttons. The primary action
+/// uses the amber `GradientPillButton`, the secondary is a low-key
+/// glass pill that pops `secondaryReturn`.
+///
+/// Returns the value associated with whichever button was tapped, or
+/// `null` if dismissed via tap-outside.
+class _GlassAlertDialog extends StatelessWidget {
+  const _GlassAlertDialog({
+    required this.title,
+    required this.message,
+    required this.primaryLabel,
+    this.secondaryLabel,
+    this.primaryReturn,
+    this.secondaryReturn,
   });
 
-  final IconData icon;
-  final String label;
-  final Color color;
-  final Color iconColor;
-  final VoidCallback onTap;
-  final bool large;
+  final String title;
+  final String message;
+  final String primaryLabel;
+  final String? secondaryLabel;
+  final Object? primaryReturn;
+  final Object? secondaryReturn;
 
   @override
   Widget build(BuildContext context) {
-    final dim = large ? 88.0 : 64.0;
-    final iconSize = large ? 40.0 : 28.0;
-    return Column(
-      children: [
-        InkResponse(
-          onTap: onTap,
-          radius: dim,
-          child: Container(
-            width: dim,
-            height: dim,
-            decoration: BoxDecoration(
-              color: color,
-              shape: BoxShape.circle,
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final fg = isDark ? const Color(0xFFF7F4EE) : AppColors.ink900;
+    final fgMuted =
+        isDark ? const Color(0xFFD8D4CB) : AppColors.slate500;
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      insetPadding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.lg,
+      ),
+      child: GlassCard(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        radius: 22,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              title,
+              style: theme.textTheme.titleLarge?.copyWith(
+                color: fg,
+                fontWeight: FontWeight.w700,
+              ),
             ),
-            child: Icon(icon, color: iconColor, size: iconSize),
-          ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              message,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: fgMuted,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            if (secondaryLabel != null) ...[
+              GradientPillButton(
+                onPressed: () =>
+                    Navigator.of(context).pop(primaryReturn ?? true),
+                label: primaryLabel,
+                expanded: true,
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              TextButton(
+                onPressed: () =>
+                    Navigator.of(context).pop(secondaryReturn ?? false),
+                child: Text(
+                  secondaryLabel!,
+                  style: TextStyle(
+                    color: fgMuted,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ] else
+              GradientPillButton(
+                onPressed: () => Navigator.of(context).pop(),
+                label: primaryLabel,
+                expanded: true,
+              ),
+          ],
         ),
-        const SizedBox(height: 8),
-        Text(label, style: Theme.of(context).textTheme.labelMedium),
-      ],
+      ),
     );
   }
 }
