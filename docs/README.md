@@ -52,13 +52,14 @@ The documents are split into two groups:
 
 ## Last updated
 
-This snapshot reflects the state of `main` after the **Vercel CLI local-build hardening** milestone:
+This snapshot reflects the state of `main` after the **UI overhaul Phase 1 — Home screen** milestone:
 
 - Firebase ID token auth on `/api/transcribe` (chapter 04 + 08).
 - Hybrid pricing model with server-side quotas, kill switch, and live usage meter in the app (chapter 09).
 - Financial projections + test plan + solo-developer playbook (chapters 10-12).
 - UI design system — navy + amber palette, spacing/radii/typography tokens, semantic colors, Material 3 wiring (chapter 13).
-- **Local pre-deploy `vercel build` wired up** — `npm run vercel:build` runs the same pipeline Vercel runs, before any push that touches `api/` or `vercel.json` (chapter 14). Auth via gitignored `secrets/vercel-cli-token`.
-- 61 unit + widget tests passing (40 monetization + 21 design system).
+- Local pre-deploy `vercel build` wired up via `npm run vercel:build` (chapter 14). Auth via gitignored `secrets/vercel-cli-token`.
+- **Phase 1 home screen shipped** — time-based greeting app bar, status-chip note cards, gradient + animated usage meter, hero empty state, pulsing record FAB, skeleton loaders. 10 new home widgets in `lib/features/home/widgets/` (chapter 13 § 11).
+- 110 unit + widget tests passing (40 monetization + 21 design system Phase 0 + 49 home Phase 1).
 
-Update this doc when you ship the next significant milestone (UI Phase 1 home screen, RevenueCat product wiring, Play Store closed testing, etc.).
+Update this doc when you ship the next significant milestone (UI Phase 2 record screen, RevenueCat product wiring, Play Store closed testing, etc.).

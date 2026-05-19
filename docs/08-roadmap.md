@@ -265,7 +265,7 @@ Aesthetic direction: **Direction A — Deep navy + warm amber** (Stripe / Linear
 | Phase | Scope                                                                                                                             | Visible? | Effort | Status         |
 | ----- | --------------------------------------------------------------------------------------------------------------------------------- | -------- | ------ | -------------- |
 | **0** | Design system foundation — palette, spacing, radii, typography, semantic tokens, Material 3 theme wiring                          | No       | 3-4 hr | **✅ SHIPPED** |
-| **1** | Home screen — empty state, status-chip note cards, redesigned usage meter, time-based greeting, FAB with pulse, skeleton loading  | Yes      | 4-5 hr | Pending        |
+| **1** | Home screen — empty state, status-chip note cards, redesigned usage meter, time-based greeting, FAB with pulse, skeleton loading  | Yes      | 4-5 hr | **✅ SHIPPED** |
 | **2** | Record screen — animated waveform (history buffer, ~60fps), tabular timer, smooth state transitions, mini quota indicator         | Yes      | 5-6 hr | Pending        |
 | **3** | Note detail — hero transition, sectioned layout, polished audio player with speed control, action-item checklist, share menu      | Yes      | 4-5 hr | Pending        |
 | **4** | Paywall — feature comparison table, monthly/yearly toggle with "Save 48%" badge, "most popular" highlight, trust elements         | Yes      | 4-5 hr | Pending        |
@@ -276,7 +276,7 @@ Each phase ships as its own commit per the test-first commit discipline rule: do
 
 ## Suggested next-session sequence
 
-Phase 0 (design system) is done. The next session should start **Phase 1 — Home screen overhaul**, which is the first phase the user actually sees on screen.
+Phases 0 + 1 are done. The next session should start **Phase 2 — Record screen overhaul** (animated waveform, tabular timer, smooth state transitions, mini quota indicator). After that, Phase 3 (Note detail) is the highest-leverage user-visible change — it's the screen people open every time they finish a recording.
 
 After all 7 phases, the next big chunks are:
 
