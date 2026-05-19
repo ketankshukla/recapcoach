@@ -71,6 +71,7 @@ The `docs/` folder contains a complete chapter-by-chapter build log plus operati
 | [docs/11-test-plan.md](docs/11-test-plan.md)                             | ~120 test catalogue across unit / widget / integration / backend layers |
 | [docs/12-solo-developer-playbook.md](docs/12-solo-developer-playbook.md) | Realistic operational guide for running a paid app alone                |
 | [docs/13-ui-design-system.md](docs/13-ui-design-system.md)               | UI design system foundation (navy + amber, M3, tokens)                  |
+| [docs/14-vercel-cli-setup.md](docs/14-vercel-cli-setup.md)               | Local pre-deploy `vercel build` setup + the `npm run vercel:build` flow |
 | [docs/SETUP.md](docs/SETUP.md)                                           | First-time Windows toolchain install                                    |
 | [docs/PUBLISH.md](docs/PUBLISH.md)                                       | Play Store closed testing checklist                                     |
 | [docs/PRIVACY_POLICY_TEMPLATE.md](docs/PRIVACY_POLICY_TEMPLATE.md)       | Privacy policy template                                                 |
@@ -167,6 +168,11 @@ flutter analyze --no-fatal-infos
 
 # TypeScript type-check on the Vercel backend
 npm run build
+
+# Full Vercel build pipeline (run before pushing api/* or vercel.json changes).
+# Cold ~60-120s, warm ~10-20s. Requires one-time CLI setup — see
+# docs/14-vercel-cli-setup.md.
+npm run vercel:build
 ```
 
 The complete test catalogue (current + planned) lives in

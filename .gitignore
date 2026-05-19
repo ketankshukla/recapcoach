@@ -60,7 +60,8 @@ debug-sha.txt
 # Node / Vercel (for the /api serverless backend)
 node_modules/
 .vercel/
-.env.local
+*.tsbuildinfo
+# .env*.local already covered by the generic .env.*.local rule above
+# but Vercel CLI re-adds these on link; tolerate them as-is.
 .env.development.local
 .env.production.local
-*.tsbuildinfo

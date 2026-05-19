@@ -26,6 +26,7 @@ The documents are split into two groups:
 | 11  | [Test plan](11-test-plan.md)                                 | Full catalogue of ~120 tests (unit / widget / integration / backend) including all payment + quota scenarios. Priority order for shipping.       |
 | 12  | [Solo developer playbook](12-solo-developer-playbook.md)     | The realistic operational guide for running a paid app alone: support load by scale, anti-feature-creep rules, runbook, mental-health protocols. |
 | 13  | [UI design system](13-ui-design-system.md)                   | Phase 0 foundation: color palette (deep navy + warm amber), spacing, radii, typography, semantic tokens, Material 3 wiring.                      |
+| 14  | [Vercel CLI setup](14-vercel-cli-setup.md)                   | Local pre-deploy verification: how to install + auth the Vercel CLI and run `npm run vercel:build` before pushing backend changes.               |
 
 ## Operational guides
 
@@ -33,6 +34,7 @@ The documents are split into two groups:
 | -------------------------------------------------------- | --------------------------------------------------------------------------------------- |
 | [SETUP.md](SETUP.md)                                     | Setting up the Windows toolchain (Flutter, JDK, Android SDK, FlutterFire) from scratch. |
 | [PUBLISH.md](PUBLISH.md)                                 | Publishing to Google Play closed testing / production.                                  |
+| [14-vercel-cli-setup.md](14-vercel-cli-setup.md)         | Auth Vercel CLI on a fresh machine and use `npm run vercel:build` before pushing.       |
 | [PRIVACY_POLICY_TEMPLATE.md](PRIVACY_POLICY_TEMPLATE.md) | Drafting the privacy policy you must host before Play submission.                       |
 | [TERMS_TEMPLATE.md](TERMS_TEMPLATE.md)                   | Drafting the terms of service.                                                          |
 
@@ -50,12 +52,13 @@ The documents are split into two groups:
 
 ## Last updated
 
-This snapshot reflects the state of `main` after the **UI overhaul Phase 0 — design system foundation** milestone:
+This snapshot reflects the state of `main` after the **Vercel CLI local-build hardening** milestone:
 
 - Firebase ID token auth on `/api/transcribe` (chapter 04 + 08).
 - Hybrid pricing model with server-side quotas, kill switch, and live usage meter in the app (chapter 09).
 - Financial projections + test plan + solo-developer playbook (chapters 10-12).
-- **UI design system** — navy + amber palette, spacing/radii/typography tokens, semantic colors, Material 3 wiring (chapter 13).
+- UI design system — navy + amber palette, spacing/radii/typography tokens, semantic colors, Material 3 wiring (chapter 13).
+- **Local pre-deploy `vercel build` wired up** — `npm run vercel:build` runs the same pipeline Vercel runs, before any push that touches `api/` or `vercel.json` (chapter 14). Auth via gitignored `secrets/vercel-cli-token`.
 - 61 unit + widget tests passing (40 monetization + 21 design system).
 
 Update this doc when you ship the next significant milestone (UI Phase 1 home screen, RevenueCat product wiring, Play Store closed testing, etc.).
