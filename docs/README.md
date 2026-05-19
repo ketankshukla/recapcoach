@@ -25,6 +25,7 @@ The documents are split into two groups:
 | 10  | [Financial projections](10-financial-projections.md)         | Exact revenue + cost math at 1K / 10K / 100K / 1M users, sensitivity analysis, additional safety + profit levers.                                |
 | 11  | [Test plan](11-test-plan.md)                                 | Full catalogue of ~120 tests (unit / widget / integration / backend) including all payment + quota scenarios. Priority order for shipping.       |
 | 12  | [Solo developer playbook](12-solo-developer-playbook.md)     | The realistic operational guide for running a paid app alone: support load by scale, anti-feature-creep rules, runbook, mental-health protocols. |
+| 13  | [UI design system](13-ui-design-system.md)                   | Phase 0 foundation: color palette (deep navy + warm amber), spacing, radii, typography, semantic tokens, Material 3 wiring.                      |
 
 ## Operational guides
 
@@ -49,11 +50,12 @@ The documents are split into two groups:
 
 ## Last updated
 
-This snapshot reflects the state of `main` after the **monetization safety net** + **business planning** milestone:
+This snapshot reflects the state of `main` after the **UI overhaul Phase 0 — design system foundation** milestone:
 
 - Firebase ID token auth on `/api/transcribe` (chapter 04 + 08).
 - Hybrid pricing model with server-side quotas, kill switch, and live usage meter in the app (chapter 09).
 - Financial projections + test plan + solo-developer playbook (chapters 10-12).
-- Starter unit tests for the monetization foundation (40 tests, all passing).
+- **UI design system** — navy + amber palette, spacing/radii/typography tokens, semantic colors, Material 3 wiring (chapter 13).
+- 61 unit + widget tests passing (40 monetization + 21 design system).
 
-Update this doc when you ship the next significant milestone (RevenueCat product wiring, UI overhaul, Play Store closed testing, etc.).
+Update this doc when you ship the next significant milestone (UI Phase 1 home screen, RevenueCat product wiring, Play Store closed testing, etc.).

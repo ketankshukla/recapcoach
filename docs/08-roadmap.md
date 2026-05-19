@@ -258,22 +258,29 @@ Worth being explicit about, since these are tempting but bad ideas at this stage
 
 ---
 
+## UI overhaul — 7-phase plan
+
+Aesthetic direction: **Direction A — Deep navy + warm amber** (Stripe / Linear feel; signals "expensive enough to be serious" to the consulting audience). Documented in [chapter 13](13-ui-design-system.md).
+
+| Phase | Scope                                                                                                                             | Visible? | Effort | Status         |
+| ----- | --------------------------------------------------------------------------------------------------------------------------------- | -------- | ------ | -------------- |
+| **0** | Design system foundation — palette, spacing, radii, typography, semantic tokens, Material 3 theme wiring                          | No       | 3-4 hr | **✅ SHIPPED** |
+| **1** | Home screen — empty state, status-chip note cards, redesigned usage meter, time-based greeting, FAB with pulse, skeleton loading  | Yes      | 4-5 hr | Pending        |
+| **2** | Record screen — animated waveform (history buffer, ~60fps), tabular timer, smooth state transitions, mini quota indicator         | Yes      | 5-6 hr | Pending        |
+| **3** | Note detail — hero transition, sectioned layout, polished audio player with speed control, action-item checklist, share menu      | Yes      | 4-5 hr | Pending        |
+| **4** | Paywall — feature comparison table, monthly/yearly toggle with "Save 48%" badge, "most popular" highlight, trust elements         | Yes      | 4-5 hr | Pending        |
+| **5** | Settings — sectioned cards, avatar + plan badge, manage-subscription deep link, usage section, export-data / delete-account flows | Yes      | 3-4 hr | Pending        |
+| **6** | Auth + onboarding — 3-screen intro with subtle animations, polished sign-in, sign-out confirmation                                | Yes      | 2-3 hr | Pending        |
+
+Each phase ships as its own commit per the test-first commit discipline rule: docs updated, tests added/updated, `flutter test` green before pushing.
+
 ## Suggested next-session sequence
 
-Auth + quotas are done. The next session is the **UI overhaul** — RecapCoach
-should _look_ like a paid product before we ask anyone to pay.
+Phase 0 (design system) is done. The next session should start **Phase 1 — Home screen overhaul**, which is the first phase the user actually sees on screen.
 
-If you have ~2 hours, do this in order:
-
-1. **2 min** — 1.2 OpenAI billing cap (manual, Vercel dashboard)
-2. **30 min** — UI: themed color palette (warm professional), typography (Inter or Geist), and Material 3 expressive components on home/record/detail screens
-3. **30 min** — UI: real recording-screen waveform (`AnimatedBuilder` + amplitude history buffer), refined empty state with illustration
-4. **20 min** — UI: paywall redesign with feature comparison table, "most popular" yearly badge, smooth transitions
-5. **10 min** — UI: settings redesign with sectioned cards + subscription status surface
-6. **5 min** — commit + push + tag a release: `v0.3.0`
-
-After that, the next big chunks are:
+After all 7 phases, the next big chunks are:
 
 - **RevenueCat product wiring** (Tier 3 below): create products in Play Console, configure entitlements, wire the actual purchase flow. Without this, no one can become Pro.
+- **OpenAI monthly billing cap** (1.2): 2 min in the OpenAI dashboard.
 - **Audio cloud sync** (2.1): so users don't lose recordings on uninstall.
 - **Play Store closed testing** (4.1): real users, real feedback.

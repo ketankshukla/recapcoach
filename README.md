@@ -8,7 +8,7 @@ Built for solo consultants and coaches who want their post-call admin done befor
 
 🟢 **Working end-to-end on real Android hardware**, with the OpenAI key now protected behind Firebase auth **and** per-plan quotas. Notes are recorded, transcribed via OpenAI Whisper + gpt-4o-mini through a Vercel backend, and synced to Firestore so they survive uninstall and follow the user across devices.
 
-Next milestone: **UI overhaul** (professional theme, animated waveform, redesigned paywall + settings), then RevenueCat product wiring, then Play Store closed testing.
+Next milestone: **UI overhaul** in progress — Phase 0 (design system foundation) shipped; Phases 1-6 (home, record, detail, paywall, settings, auth+onboarding) next. Then RevenueCat product wiring, then Play Store closed testing.
 
 See **[docs/](docs/README.md)** for the full chapter-by-chapter build log, architecture diagrams, and roadmap.
 
@@ -70,6 +70,7 @@ The `docs/` folder contains a complete chapter-by-chapter build log plus operati
 | [docs/10-financial-projections.md](docs/10-financial-projections.md)     | Exact revenue + cost math at 1K / 10K / 100K / 1M users + safety levers |
 | [docs/11-test-plan.md](docs/11-test-plan.md)                             | ~120 test catalogue across unit / widget / integration / backend layers |
 | [docs/12-solo-developer-playbook.md](docs/12-solo-developer-playbook.md) | Realistic operational guide for running a paid app alone                |
+| [docs/13-ui-design-system.md](docs/13-ui-design-system.md)               | UI design system foundation (navy + amber, M3, tokens)                  |
 | [docs/SETUP.md](docs/SETUP.md)                                           | First-time Windows toolchain install                                    |
 | [docs/PUBLISH.md](docs/PUBLISH.md)                                       | Play Store closed testing checklist                                     |
 | [docs/PRIVACY_POLICY_TEMPLATE.md](docs/PRIVACY_POLICY_TEMPLATE.md)       | Privacy policy template                                                 |
@@ -95,7 +96,8 @@ recapcoach/
 │  │  ├─ config/           env vars (BACKEND_URL via --dart-define)
 │  │  ├─ logging/          talker logger
 │  │  ├─ router/           go_router config
-│  │  ├─ theme/            light/dark Material 3
+│  │  ├─ theme/            Design system: app_colors, app_spacing, app_radii,
+│  │  │                    app_typography, app_semantic_colors, app_theme
 │  │  └─ widgets/          feature_gate, loading_view, error_view
 │  ├─ features/
 │  │  ├─ auth/             Firebase Auth + Google Sign-In
@@ -110,7 +112,9 @@ recapcoach/
 │  │  └─ usage/            monthly UsageSnapshot model + live Firestore stream
 │  └─ shared/              cross-feature providers + services
 ├─ docs/                   Documentation (see above)
-├─ test/                   Flutter unit + widget tests
+├─ test/                   Flutter unit + widget tests (61 tests, all passing)
+│  ├─ core/
+│  │  └─ theme/            Design-system token + ThemeData wiring tests
 │  └─ features/
 │     ├─ usage/            UsageSnapshot math + currentUtcMonthKey UTC rollover tests
 │     └─ transcription/    TranscriptionException / error-kind sanity tests
@@ -155,7 +159,7 @@ See [docs/PUBLISH.md](docs/PUBLISH.md) for the full Play Store closed-testing ch
 ## Tests
 
 ```powershell
-# Flutter unit + widget tests (~40 tests, runs in seconds)
+# Flutter unit + widget tests (61 tests, runs in ~10 seconds)
 flutter test
 
 # Static analysis (zero issues in app code; existing infos are pre-existing)

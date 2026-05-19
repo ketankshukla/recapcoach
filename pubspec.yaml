@@ -58,6 +58,11 @@ dependencies:
   package_info_plus: ^8.0.2
   device_info_plus: ^10.1.2
 
+  # Typography: see docs/13-ui-design-system.md "Typography" section.
+  # We use the OS system font (Roboto on Android, San Francisco on iOS)
+  # by default; Inter TTF files can be bundled later for a more
+  # distinctive look without changing any widget code.
+
   # Logging
   talker_flutter: ^4.4.1
   talker_riverpod_logger: ^4.4.1
