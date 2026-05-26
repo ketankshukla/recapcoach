@@ -41,7 +41,18 @@ class Env {
     defaultValue: '',
   );
 
+  /// Firebase UID of the app developer, passed at build time via:
+  ///   flutter run --dart-define=DEVELOPER_UID=<uid>
+  /// When the signed-in user matches this UID the client-side
+  /// `isDeveloperProvider` returns true regardless of Firestore config.
+  /// The server-side bypass uses the `DEVELOPER_UIDS` env var instead.
+  static const String developerUid = String.fromEnvironment(
+    'DEVELOPER_UID',
+    defaultValue: '',
+  );
+
   static bool get isProd => flavor == Flavor.prod;
   static bool get isDev => flavor == Flavor.dev;
   static bool get hasBackend => backendUrl.isNotEmpty;
+  static bool get hasDeveloperUid => developerUid.isNotEmpty;
 }
