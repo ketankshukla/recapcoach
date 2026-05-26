@@ -65,26 +65,33 @@ final monthlyUsageProvider = StreamProvider<UsageSnapshot>((ref) async* {
   }
 });
 
-/// Real-time usage for the hero card that reflects local note changes
-/// (adds AND deletes) instantly.
+/// Real-time usage for the hero card.
 ///
-/// Computes recordings count and total seconds from the local Hive
-/// note list (which fires on every CRUD operation) and merges with the
-/// Firestore-backed snapshot for plan/limits/developer metadata.
+/// **Developer accounts** — usage is computed from local notes so
+/// the hero updates instantly on every add / delete. Developers have
+/// no caps, so showing the live local count is the right UX.
 ///
-/// Use this for **display** in the hero section.  Keep using
-/// [monthlyUsageProvider] for **quota enforcement** (pre-flight
-/// checks, cap dialogs) because the server is the source of truth.
+/// **Non-developer accounts** — usage comes from the server-side
+/// Firestore counters, which are incremented on every recording and
+/// **never decremented** on delete. This prevents users from gaming
+/// the quota by deleting and re-recording. The hero accurately
+/// reflects cumulative usage against the monthly cap.
+///
+/// Quota enforcement (pre-flight cap check on the record screen)
+/// always uses [monthlyUsageProvider] directly.
 final liveUsageProvider = Provider<UsageSnapshot?>((ref) {
   final serverUsage = ref.watch(monthlyUsageProvider).value;
-  final notes = ref.watch(notesStreamProvider).value;
-
   if (serverUsage == null) return null;
 
-  // If we don't have local notes yet, fall back to server data.
+  // Non-developers: always show server-side cumulative counters.
+  // These never decrease, so the hero correctly reflects cap usage
+  // even after the user deletes recordings.
+  if (!serverUsage.isDeveloper) return serverUsage;
+
+  // Developers: compute from local notes for instant feedback.
+  final notes = ref.watch(notesStreamProvider).value;
   if (notes == null) return serverUsage;
 
-  // Filter notes to current month only.
   final now = DateTime.now().toUtc();
   final thisMonth = notes.where((n) {
     final c = n.createdAt.toUtc();
