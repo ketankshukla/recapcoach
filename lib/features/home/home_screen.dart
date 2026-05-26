@@ -293,7 +293,7 @@ class _CapExhaustedState extends StatelessWidget {
                   child: ElevatedButton(
                     onPressed: onUpgrade,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.amber500,
+                      backgroundColor: AppColors.amber600,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
