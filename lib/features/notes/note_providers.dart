@@ -28,17 +28,22 @@ final noteSyncServiceProvider = Provider<NoteSyncService>((ref) {
   );
 });
 
-/// Watches Firebase auth state. The first time we see a signed-in user (per
-/// session), we trigger a one-shot cloud-to-local sync. The bootstrap is
-/// idempotent: it tracks UIDs it has already synced this session.
+/// Watches Firebase auth state. Every time a signed-in user appears (after
+/// sign-in or account switch), we clear the local cache and re-sync from the
+/// cloud. This ensures notes from one account never bleed into another.
 final noteSyncBootstrapProvider = Provider<void>((ref) {
-  final syncedUids = <String>{};
+  String? lastSyncedUid;
   ref.listen<AsyncValue<User?>>(authStateProvider, (prev, next) {
     final user = next.value;
-    if (user == null) return;
+    if (user == null) {
+      lastSyncedUid = null;
+      return;
+    }
     final uid = user.uid;
-    if (syncedUids.contains(uid)) return;
-    syncedUids.add(uid);
+    // Skip if we've already synced this exact UID in this provider lifetime
+    // AND the previous auth state was the same user (not a re-sign-in).
+    if (uid == lastSyncedUid && prev?.value?.uid == uid) return;
+    lastSyncedUid = uid;
     final svc = ref.read(noteSyncServiceProvider);
     svc.syncForUser(uid).then((pulled) {
       logger.info('Sync bootstrap: pulled $pulled note(s) for uid=$uid');

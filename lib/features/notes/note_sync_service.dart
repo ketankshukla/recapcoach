@@ -33,13 +33,21 @@ class NoteSyncService {
   /// fatal Firestore errors (e.g. permission denied).
   Future<int> syncForUser(String uid) async {
     final lastUid = _prefs.getString(_lastUidKey);
-    if (lastUid != null && lastUid != uid) {
+    // Always clear the local cache on sign-in to prevent notes from
+    // one account bleeding into another. This is the safe default:
+    // the cloud pull below will repopulate with the correct data.
+    if (lastUid != uid) {
       logger.info(
         'NoteSyncService: UID changed ($lastUid -> $uid). '
         'Clearing local cache before sync.',
       );
-      await _local.clearAllLocalOnly();
+    } else {
+      logger.info(
+        'NoteSyncService: same UID ($uid) re-sign-in. '
+        'Clearing local cache to refresh from cloud.',
+      );
     }
+    await _local.clearAllLocalOnly();
 
     logger.info('NoteSyncService: pulling cloud notes for uid=$uid');
     final cloudNotes = await _cloud.all(uid);
