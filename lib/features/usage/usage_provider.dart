@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/config/developer.dart';
 import '../auth/auth_providers.dart';
+import '../notes/note_providers.dart';
 import '../paywall/entitlement_provider.dart';
 import 'usage.dart';
 
@@ -62,4 +63,46 @@ final monthlyUsageProvider = StreamProvider<UsageSnapshot>((ref) async* {
       isDeveloper: isDeveloper,
     );
   }
+});
+
+/// Real-time usage for the hero card that reflects local note changes
+/// (adds AND deletes) instantly.
+///
+/// Computes recordings count and total seconds from the local Hive
+/// note list (which fires on every CRUD operation) and merges with the
+/// Firestore-backed snapshot for plan/limits/developer metadata.
+///
+/// Use this for **display** in the hero section.  Keep using
+/// [monthlyUsageProvider] for **quota enforcement** (pre-flight
+/// checks, cap dialogs) because the server is the source of truth.
+final liveUsageProvider = Provider<UsageSnapshot?>((ref) {
+  final serverUsage = ref.watch(monthlyUsageProvider).value;
+  final notes = ref.watch(notesStreamProvider).value;
+
+  if (serverUsage == null) return null;
+
+  // If we don't have local notes yet, fall back to server data.
+  if (notes == null) return serverUsage;
+
+  // Filter notes to current month only.
+  final now = DateTime.now().toUtc();
+  final thisMonth = notes.where((n) {
+    final c = n.createdAt.toUtc();
+    return c.year == now.year && c.month == now.month;
+  }).toList();
+
+  final localCount = thisMonth.length;
+  final localSeconds =
+      thisMonth.fold<int>(0, (sum, n) => sum + (n.durationMs ~/ 1000));
+
+  return UsageSnapshot(
+    plan: serverUsage.plan,
+    monthKey: serverUsage.monthKey,
+    usedSeconds: localSeconds,
+    usedRecordings: localCount,
+    limitSeconds: serverUsage.limitSeconds,
+    limitRecordings: serverUsage.limitRecordings,
+    limitPerRecordingSeconds: serverUsage.limitPerRecordingSeconds,
+    isDeveloper: serverUsage.isDeveloper,
+  );
 });

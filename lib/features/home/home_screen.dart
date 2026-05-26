@@ -58,7 +58,7 @@ class HomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(currentUserProvider);
     final notesAsync = ref.watch(notesStreamProvider);
-    final usage = ref.watch(monthlyUsageProvider).value;
+    final usage = ref.watch(liveUsageProvider);
 
     return Scaffold(
       backgroundColor: Colors.transparent,

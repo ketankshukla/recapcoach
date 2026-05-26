@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
@@ -55,14 +56,15 @@ Future<void> main() async {
     await container.read(purchasesServiceProvider).configure();
     await container.read(analyticsProvider).track(AnalyticsEvents.appOpen);
 
-    // One-time log on debug builds: prints the signed-in UID so the
-    // developer can grab it for `/config/global.developerUids` in
-    // Firebase Console without rummaging through Firebase Auth.
+    // Debug builds: log the signed-in UID AND auto-register it in
+    // Firestore `/config/global.developerUids` so the developer bypass
+    // works immediately without manual Firebase Console edits.
     if (kDebugMode) {
       FirebaseAuth.instance.userChanges().listen((user) {
         if (user != null) {
           // ignore: avoid_print
           print('[DEV-UID] ${user.uid}  email=${user.email}');
+          _ensureDeveloperUid(user.uid);
         }
       });
     }
@@ -77,4 +79,29 @@ Future<void> main() async {
     logger.error('Uncaught zone error', error, stack);
     FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
   });
+}
+
+/// Adds [uid] to `/config/global.developerUids` in Firestore if it
+/// isn't already there. Uses `arrayUnion` so it's safe to call
+/// repeatedly — Firestore deduplicates automatically.
+///
+/// Only called in debug builds (guarded by `kDebugMode` in `main`).
+/// In production builds this function is never invoked.
+Future<void> _ensureDeveloperUid(String uid) async {
+  try {
+    final doc = FirebaseFirestore.instance.doc('config/global');
+    await doc.set(
+      {
+        'developerUids': FieldValue.arrayUnion([uid]),
+      },
+      SetOptions(merge: true),
+    );
+    // ignore: avoid_print
+    if (kDebugMode) print('[DEV] Registered $uid in /config/global.developerUids');
+  } catch (e) {
+    // Non-fatal: if Firestore rules block the write, the developer
+    // can still add the UID manually via Firebase Console.
+    // ignore: avoid_print
+    if (kDebugMode) print('[DEV] Could not auto-register UID: $e');
+  }
 }

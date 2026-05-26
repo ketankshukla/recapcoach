@@ -46,9 +46,13 @@ service cloud.firestore {
     // (We removed the previous catch-all wildcard match so that profile
     // and usage docs require the stricter rules above.)
 
-    // Global config -- backend only.
+    // Global config -- any authenticated user can read (the document
+    // only contains feature flags and the developer UID allowlist;
+    // nothing secret). Writes are backend-only (service account
+    // bypasses rules).
     match /config/{document=**} {
-      allow read, write: if false;
+      allow read:  if request.auth != null;
+      allow write: if false;
     }
 
     // Default deny everything else.
