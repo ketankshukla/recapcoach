@@ -233,18 +233,8 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
           child: SafeArea(
             child: Stack(
               children: [
-                // Floating cancel control in the top-left corner.
-                Positioned(
-                  top: AppSpacing.sm,
-                  left: AppSpacing.sm,
-                  child: GlassIconButton(
-                    icon: Icons.close_rounded,
-                    tooltip: 'Cancel',
-                    onPressed: _cancel,
-                  ),
-                ),
-
-                // Main column.
+                // Main column — declared FIRST so the floating cancel
+                // button below sits on top and actually receives taps.
                 Padding(
                   padding: const EdgeInsets.fromLTRB(
                     AppSpacing.lg,
@@ -334,6 +324,18 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
                       ),
                       const SizedBox(height: AppSpacing.xs),
                     ],
+                  ),
+                ),
+
+                // Floating cancel control — declared LAST so it sits
+                // on top of the main column and receives taps.
+                Positioned(
+                  top: AppSpacing.sm,
+                  left: AppSpacing.sm,
+                  child: GlassIconButton(
+                    icon: Icons.close_rounded,
+                    tooltip: 'Cancel',
+                    onPressed: _cancel,
                   ),
                 ),
               ],

@@ -48,6 +48,14 @@ class NoteDetailScreen extends ConsumerWidget {
           child: SafeArea(
             child: Stack(
               children: [
+                // Content first so the floating Back button below
+                // sits on top of it and actually receives taps.
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(AppSpacing.lg),
+                    child: Text('Note not found.'),
+                  ),
+                ),
                 Positioned(
                   top: AppSpacing.sm,
                   left: AppSpacing.sm,
@@ -55,12 +63,6 @@ class NoteDetailScreen extends ConsumerWidget {
                     icon: Icons.arrow_back_rounded,
                     tooltip: 'Back',
                     onPressed: () => context.pop(),
-                  ),
-                ),
-                const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(AppSpacing.lg),
-                    child: Text('Note not found.'),
                   ),
                 ),
               ],
@@ -82,28 +84,9 @@ class NoteDetailScreen extends ConsumerWidget {
         child: SafeArea(
           child: Stack(
             children: [
-              // ---- Floating top controls ----
-              Positioned(
-                top: AppSpacing.sm,
-                left: AppSpacing.sm,
-                child: GlassIconButton(
-                  icon: Icons.arrow_back_rounded,
-                  tooltip: 'Back',
-                  onPressed: () => context.pop(),
-                ),
-              ),
-              Positioned(
-                top: AppSpacing.sm,
-                right: AppSpacing.sm,
-                child: GlassIconButton(
-                  icon: Icons.delete_outline_rounded,
-                  tooltip: 'Delete',
-                  tint: AppColors.error600,
-                  onPressed: () => _confirmDelete(context, ref, note),
-                ),
-              ),
-
-              // ---- Scrollable content ----
+              // ---- Scrollable content (declared FIRST so the floating
+              //      glass buttons below sit on top of it and actually
+              //      receive taps; Stack: later children win hit tests) ----
               ListView(
                 padding: const EdgeInsets.fromLTRB(
                   AppSpacing.lg,
@@ -161,6 +144,28 @@ class NoteDetailScreen extends ConsumerWidget {
                         : () => _copy(context, note.transcript!),
                   ),
                 ],
+              ),
+
+              // ---- Floating top controls (declared LAST so they sit
+              //      on top of the ListView and receive taps) ----
+              Positioned(
+                top: AppSpacing.sm,
+                left: AppSpacing.sm,
+                child: GlassIconButton(
+                  icon: Icons.arrow_back_rounded,
+                  tooltip: 'Back',
+                  onPressed: () => context.pop(),
+                ),
+              ),
+              Positioned(
+                top: AppSpacing.sm,
+                right: AppSpacing.sm,
+                child: GlassIconButton(
+                  icon: Icons.delete_outline_rounded,
+                  tooltip: 'Delete',
+                  tint: AppColors.error600,
+                  onPressed: () => _confirmDelete(context, ref, note),
+                ),
               ),
             ],
           ),

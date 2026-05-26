@@ -118,17 +118,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         child: SafeArea(
           child: Stack(
             children: [
-              // Floating back button.
-              Positioned(
-                top: AppSpacing.sm,
-                left: AppSpacing.sm,
-                child: GlassIconButton(
-                  icon: Icons.arrow_back_rounded,
-                  tooltip: 'Back',
-                  onPressed: () => context.pop(),
-                ),
-              ),
-
+              // Scrollable content sits BEHIND the floating buttons --
+              // declared first so it doesn't intercept taps on the
+              // top-corner glass icon buttons.
               ListView(
                 padding: const EdgeInsets.fromLTRB(
                   AppSpacing.lg,
@@ -286,6 +278,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     ),
                   ),
                 ],
+              ),
+
+              // Floating back button -- declared LAST so it sits on top
+              // of the ListView and actually receives taps in its
+              // top-left corner. (Stack: later children win hit tests.)
+              Positioned(
+                top: AppSpacing.sm,
+                left: AppSpacing.sm,
+                child: GlassIconButton(
+                  icon: Icons.arrow_back_rounded,
+                  tooltip: 'Back',
+                  onPressed: () => context.pop(),
+                ),
               ),
             ],
           ),

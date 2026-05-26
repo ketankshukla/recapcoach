@@ -129,7 +129,8 @@ export default async function handler(
 
   // Quick early bail-out: if the user has already hit the per-month recording
   // count, we don't need to bother parsing the upload.
-  if (ctx.used.count >= ctx.limits.maxMonthlyRecordings) {
+  // Developers bypass this check so they can keep testing.
+  if (!ctx.isDeveloper && ctx.used.count >= ctx.limits.maxMonthlyRecordings) {
     return respondQuotaExceeded(
       res,
       new QuotaExceededError(

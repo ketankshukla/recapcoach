@@ -109,16 +109,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         child: SafeArea(
           child: Stack(
             children: [
-              // Floating Skip pill in the top-right corner.
-              Positioned(
-                top: AppSpacing.sm,
-                right: AppSpacing.sm,
-                child: GlassPillButton(
-                  label: 'Skip',
-                  onPressed: _skip,
-                ),
-              ),
-
+              // Main content first so the floating Skip below sits on
+              // top of it and actually receives taps.
               Column(
                 children: [
                   const SizedBox(height: 80), // leave room for floating Skip
@@ -168,6 +160,17 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   ),
                   const SizedBox(height: AppSpacing.lg),
                 ],
+              ),
+
+              // Floating Skip pill -- declared LAST so it sits on top
+              // of the Column and actually receives taps.
+              Positioned(
+                top: AppSpacing.sm,
+                right: AppSpacing.sm,
+                child: GlassPillButton(
+                  label: 'Skip',
+                  onPressed: _skip,
+                ),
               ),
             ],
           ),
