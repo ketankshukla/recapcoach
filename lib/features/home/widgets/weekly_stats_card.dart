@@ -87,25 +87,43 @@ class WeeklyStatsCard extends StatelessWidget {
     // numbers on screen are the same numbers the server enforces.
     final usedRecordings = usage?.usedRecordings ?? 0;
     final limitRecordings = usage?.limitRecordings ?? 0;
-    final usedMinutes = ((usage?.usedSeconds ?? 0) / 60).round();
-    final limitMinutes = ((usage?.limitSeconds ?? 0) / 60).round();
+    final usedSeconds = usage?.usedSeconds ?? 0;
+    final limitSeconds = usage?.limitSeconds ?? 0;
+
+    // Format exact time as "Xm Ys" for precision.
+    String fmtTime(int totalSec) {
+      final m = totalSec ~/ 60;
+      final s = totalSec % 60;
+      if (m == 0 && s == 0) return '0m 0s';
+      if (m == 0) return '${s}s';
+      if (s == 0) return '${m}m';
+      return '${m}m ${s}s';
+    }
+
+    final usedTimeLabel = fmtTime(usedSeconds);
+    final limitTimeLabel = fmtTime(limitSeconds);
+
+    // Remaining values for non-developer accounts.
+    final remainingRecordings =
+        (limitRecordings - usedRecordings).clamp(0, limitRecordings);
+    final remainingSeconds =
+        (limitSeconds - usedSeconds).clamp(0, limitSeconds);
+    final remainingTimeLabel = fmtTime(remainingSeconds);
 
     // Stat row labels adapt to dev vs free vs pro.
     //
     //  - Developer: just the count, no "/cap" suffix, "unlimited"
     //    sub-label.
-    //  - Free / Pro: "used / cap" big text, "recordings\nthis month"
-    //    sub-label so it's obvious what the cap context is.
+    //  - Free / Pro: "used / cap" big text with exact time, plus a
+    //    clear "remaining" summary below the stats row.
     final recordingsValue =
         isDeveloper ? '$usedRecordings' : '$usedRecordings/$limitRecordings';
-    final minutesValue =
-        isDeveloper ? '$usedMinutes' : '$usedMinutes/$limitMinutes';
     final recordingsLabel = isDeveloper
         ? (usedRecordings == 1 ? 'recording\nunlimited' : 'recordings\nunlimited')
-        : 'recordings\nthis month';
+        : 'recordings\nused this month';
     final minutesLabel = isDeveloper
-        ? (usedMinutes == 1 ? 'minute\nunlimited' : 'minutes\nunlimited')
-        : 'minutes\nthis month';
+        ? 'time\nunlimited'
+        : 'time\nused this month';
 
     // Arc center: percent / PRO / CAP / DEV depending on plan + state.
     final String arcHead;
@@ -122,6 +140,19 @@ class WeeklyStatsCard extends StatelessWidget {
     } else {
       arcHead = '${(progress * 100).round()}%';
       arcSub = 'used';
+    }
+
+    // Remaining summary line for non-developer accounts.
+    final String? remainingSummary;
+    if (isDeveloper) {
+      remainingSummary = null;
+    } else if (atCap) {
+      remainingSummary = 'You have reached your monthly cap. '
+          'Upgrade to Pro for more recordings.';
+    } else {
+      remainingSummary = '$remainingRecordings recordings and '
+          '$remainingTimeLabel remaining this month. '
+          'Deleted recordings still count toward your cap.';
     }
 
     // Foreground text color tuned for the glass surface in each mode.
@@ -232,8 +263,9 @@ class WeeklyStatsCard extends StatelessWidget {
               ),
               _Divider(isDark: isDark),
               Expanded(
-                child: _Stat(
-                  value: minutesValue,
+                child: _TimeStat(
+                  value: isDeveloper ? usedTimeLabel : usedTimeLabel,
+                  ofValue: isDeveloper ? null : limitTimeLabel,
                   label: minutesLabel,
                   fg: fg,
                   fgMuted: fgMuted,
@@ -284,6 +316,48 @@ class WeeklyStatsCard extends StatelessWidget {
               ),
             ],
           ),
+
+          // Remaining summary — only for non-developer accounts.
+          if (remainingSummary != null) ...[
+            const SizedBox(height: AppSpacing.md),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: AppSpacing.sm,
+              ),
+              decoration: BoxDecoration(
+                color: isDark
+                    ? (atCap
+                        ? Colors.red.withValues(alpha: 0.12)
+                        : Colors.white.withValues(alpha: 0.05))
+                    : (atCap
+                        ? Colors.red.withValues(alpha: 0.08)
+                        : Colors.black.withValues(alpha: 0.04)),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: isDark
+                      ? (atCap
+                          ? Colors.red.withValues(alpha: 0.25)
+                          : Colors.white.withValues(alpha: 0.08))
+                      : (atCap
+                          ? Colors.red.withValues(alpha: 0.20)
+                          : Colors.black.withValues(alpha: 0.06)),
+                ),
+              ),
+              child: Text(
+                remainingSummary,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: atCap
+                      ? (isDark ? Colors.red.shade200 : Colors.red.shade700)
+                      : fgMuted,
+                  fontSize: 11.5,
+                  height: 1.4,
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -319,6 +393,65 @@ class _Stat extends StatelessWidget {
             letterSpacing: -0.8,
           ),
         ),
+        const SizedBox(height: 6),
+        Text(
+          label,
+          textAlign: TextAlign.center,
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: fgMuted,
+            fontSize: 10.5,
+            height: 1.2,
+            letterSpacing: 0.2,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _TimeStat extends StatelessWidget {
+  const _TimeStat({
+    required this.value,
+    this.ofValue,
+    required this.label,
+    required this.fg,
+    required this.fgMuted,
+  });
+
+  final String value;
+  final String? ofValue;
+  final String label;
+  final Color fg;
+  final Color fgMuted;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Text(
+          value,
+          style: theme.textTheme.displaySmall?.copyWith(
+            color: fg,
+            fontWeight: FontWeight.w700,
+            fontSize: 24,
+            height: 1.0,
+            letterSpacing: -0.4,
+          ),
+        ),
+        if (ofValue != null) ...[
+          const SizedBox(height: 2),
+          Text(
+            'of $ofValue',
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: fgMuted,
+              fontSize: 11,
+              height: 1.0,
+              letterSpacing: 0.2,
+            ),
+          ),
+        ],
         const SizedBox(height: 6),
         Text(
           label,
