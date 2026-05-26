@@ -123,7 +123,8 @@ export default async function handler(
     return;
   }
   console.log(
-    `[transcribe] uid=${user.uid} plan=${ctx.plan} used=${ctx.used.seconds}s/${ctx.used.count}rec ` +
+    `[transcribe] uid=${user.uid} plan=${ctx.plan} isDeveloper=${ctx.isDeveloper} ` +
+      `used=${ctx.used.seconds}s/${ctx.used.count}rec ` +
       `caps=${ctx.limits.maxMonthlySeconds}s/${ctx.limits.maxMonthlyRecordings}rec`
   );
 

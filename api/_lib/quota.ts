@@ -70,15 +70,32 @@ const DEFAULT_GLOBAL: GlobalConfig = {
   developerUids: [],
 };
 
+/**
+ * Developer UIDs from the `DEVELOPER_UIDS` environment variable.
+ * Comma-separated list of Firebase UIDs that bypass quota enforcement.
+ * Set this in Vercel project settings → Environment Variables so it
+ * works even if the Firestore `/config/global` doc is missing or empty.
+ */
+function envDeveloperUids(): string[] {
+  const raw = process.env.DEVELOPER_UIDS ?? "";
+  return raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
 /** Read /config/global with safe defaults if the doc is missing. */
 async function readGlobalConfig(): Promise<GlobalConfig> {
   const snap = await getFirestore().doc("config/global").get();
-  if (!snap.exists) return DEFAULT_GLOBAL;
+  if (!snap.exists)
+    return { ...DEFAULT_GLOBAL, developerUids: envDeveloperUids() };
   const data = snap.data() ?? {};
   const rawDevs = data.developerUids;
-  const developerUids = Array.isArray(rawDevs)
+  const firestoreDevs = Array.isArray(rawDevs)
     ? rawDevs.filter((u: unknown): u is string => typeof u === "string")
     : [];
+  // Merge: Firestore UIDs + env-var UIDs (deduplicated).
+  const developerUids = [...new Set([...firestoreDevs, ...envDeveloperUids()])];
   return {
     transcriptionEnabled: data.transcriptionEnabled !== false, // default true
     freeOverride:
