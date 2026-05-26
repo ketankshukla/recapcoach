@@ -93,7 +93,7 @@ final liveUsageProvider = Provider<UsageSnapshot?>((ref) {
 
   final localCount = thisMonth.length;
   final localSeconds =
-      thisMonth.fold<int>(0, (sum, n) => sum + (n.durationMs ~/ 1000));
+      thisMonth.fold<int>(0, (acc, n) => acc + (n.durationMs ~/ 1000));
 
   return UsageSnapshot(
     plan: serverUsage.plan,

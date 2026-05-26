@@ -1,1 +1,22 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"recapcoach-dev","appId":"1:147932137922:android:7be2d08a168163b66bae5b","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"recapcoach-dev","configurations":{"android":"1:147932137922:android:7be2d08a168163b66bae5b"}}}}}}
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "recapcoach-dev",
+          "appId": "1:147932137922:android:7be2d08a168163b66bae5b",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "recapcoach-dev",
+          "configurations": {
+            "android": "1:147932137922:android:7be2d08a168163b66bae5b"
+          }
+        }
+      }
+    }
+  },
+  "firestore": { "rules": "firestore.rules" }
+}
