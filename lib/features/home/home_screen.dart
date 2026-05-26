@@ -11,6 +11,7 @@ import '../notes/note_providers.dart';
 import '../usage/usage.dart';
 import '../usage/usage_provider.dart';
 import 'widgets/empty_state.dart';
+import 'widgets/glass_card.dart';
 import 'widgets/mesh_gradient_background.dart';
 import 'widgets/note_card.dart';
 import 'widgets/pulsing_record_fab.dart';
@@ -93,9 +94,11 @@ class HomeScreen extends ConsumerWidget {
           ),
         ),
       ),
-      floatingActionButton: PulsingRecordFab(
-        onPressed: () => context.push(AppRoutes.record),
-      ),
+      floatingActionButton: (usage?.isAtCap ?? false) && !(usage?.isDeveloper ?? false)
+          ? null
+          : PulsingRecordFab(
+              onPressed: () => context.push(AppRoutes.record),
+            ),
     );
   }
 }
@@ -148,6 +151,11 @@ class _HomeBody extends StatelessWidget {
           const SkeletonNoteCard(),
           const SizedBox(height: AppSpacing.sm),
         ],
+      ] else if (notes.isEmpty && (usage?.isAtCap ?? false)) ...[
+        const SizedBox(height: AppSpacing.md),
+        _CapExhaustedState(
+          onUpgrade: () => context.push(AppRoutes.paywall),
+        ),
       ] else if (notes.isEmpty) ...[
         const SizedBox(height: AppSpacing.md),
         const HomeEmptyState(),
@@ -199,6 +207,113 @@ class _SectionHeader extends StatelessWidget {
           letterSpacing: 1.4,
           fontSize: 11,
         ),
+      ),
+    );
+  }
+}
+
+class _CapExhaustedState extends StatelessWidget {
+  const _CapExhaustedState({required this.onUpgrade});
+
+  final VoidCallback onUpgrade;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final fg = isDark ? const Color(0xFFF7F4EE) : AppColors.ink900;
+    final fgMuted = isDark
+        ? const Color(0xFFD8D4CB)
+        : AppColors.slate500;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.xl,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 100,
+            height: 100,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: isDark
+                    ? [Colors.red.shade900, Colors.red.shade700]
+                    : [Colors.red.shade100, Colors.red.shade50],
+              ),
+              border: Border.all(
+                color: Colors.red.withValues(alpha: 0.30),
+                width: 1.5,
+              ),
+            ),
+            child: Icon(
+              Icons.block_rounded,
+              size: 48,
+              color: isDark ? Colors.red.shade200 : Colors.red.shade600,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          GlassCard(
+            radius: 22,
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.xl,
+              vertical: AppSpacing.lg,
+            ),
+            child: Column(
+              children: [
+                Text(
+                  'Monthly cap reached',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    color: fg,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 22,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  'You\u2019ve used all your free recordings this month. '
+                  'Deleted recordings still count toward your monthly cap.\n\n'
+                  'Upgrade to Pro to unlock 100 recordings and 8 hours '
+                  'of transcription every month.',
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: fgMuted,
+                    height: 1.5,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: onUpgrade,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.amber500,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: const Text(
+                      'Upgrade to Pro',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
