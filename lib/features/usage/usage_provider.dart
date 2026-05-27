@@ -43,6 +43,21 @@ final monthlyUsageProvider = StreamProvider<UsageSnapshot>((ref) async* {
     return;
   }
 
+  // Check the user's profile doc for the trialExhausted flag. This is
+  // written by the server when a re-registered email hash is found in
+  // the `usedTrials` collection.
+  bool trialExhausted = false;
+  try {
+    final profileSnap = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .get();
+    trialExhausted =
+        (profileSnap.data()?['trialExhausted'] as bool?) ?? false;
+  } catch (_) {
+    // Profile doc may not exist yet; default to false.
+  }
+
   final doc = FirebaseFirestore.instance
       .collection('users')
       .doc(user.uid)
@@ -53,6 +68,7 @@ final monthlyUsageProvider = StreamProvider<UsageSnapshot>((ref) async* {
     plan: plan,
     monthKey: monthKey,
     isDeveloper: isDeveloper,
+    trialExhausted: trialExhausted,
   );
 
   await for (final snap in doc.snapshots()) {
@@ -61,6 +77,7 @@ final monthlyUsageProvider = StreamProvider<UsageSnapshot>((ref) async* {
       monthKey: monthKey,
       data: snap.data(),
       isDeveloper: isDeveloper,
+      trialExhausted: trialExhausted,
     );
   }
 });

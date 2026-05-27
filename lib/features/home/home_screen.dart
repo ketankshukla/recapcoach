@@ -155,6 +155,7 @@ class _HomeBody extends StatelessWidget {
         const SizedBox(height: AppSpacing.md),
         _CapExhaustedState(
           onUpgrade: () => context.push(AppRoutes.paywall),
+          trialExhausted: usage?.trialExhausted ?? false,
         ),
       ] else if (notes.isEmpty) ...[
         const SizedBox(height: AppSpacing.md),
@@ -164,6 +165,7 @@ class _HomeBody extends StatelessWidget {
         if ((usage?.isAtCap ?? false) && !(usage?.isDeveloper ?? false)) ...[
           _CapExhaustedState(
             onUpgrade: () => context.push(AppRoutes.paywall),
+            trialExhausted: usage?.trialExhausted ?? false,
           ),
         ],
         const _SectionHeader(label: 'RECENT RECORDINGS'),
@@ -219,9 +221,13 @@ class _SectionHeader extends StatelessWidget {
 }
 
 class _CapExhaustedState extends StatelessWidget {
-  const _CapExhaustedState({required this.onUpgrade});
+  const _CapExhaustedState({
+    required this.onUpgrade,
+    this.trialExhausted = false,
+  });
 
   final VoidCallback onUpgrade;
+  final bool trialExhausted;
 
   @override
   Widget build(BuildContext context) {
@@ -273,7 +279,9 @@ class _CapExhaustedState extends StatelessWidget {
             child: Column(
               children: [
                 Text(
-                  'Monthly cap reached',
+                  trialExhausted
+                      ? 'Free trial used'
+                      : 'Monthly cap reached',
                   style: theme.textTheme.titleLarge?.copyWith(
                     color: fg,
                     fontWeight: FontWeight.w700,
@@ -283,10 +291,15 @@ class _CapExhaustedState extends StatelessWidget {
                 ),
                 const SizedBox(height: AppSpacing.sm),
                 Text(
-                  'You\u2019ve used all your free recordings this month. '
-                  'Deleted recordings still count toward your monthly cap.\n\n'
-                  'Upgrade to Pro to unlock 100 recordings and 8 hours '
-                  'of transcription every month.',
+                  trialExhausted
+                      ? 'You\u2019ve previously used your free recordings. '
+                        'Free trials are one-time only.\n\n'
+                        'Upgrade to Pro to unlock 100 recordings and 8 hours '
+                        'of transcription every month.'
+                      : 'You\u2019ve used all your free recordings this month. '
+                        'Deleted recordings still count toward your monthly cap.\n\n'
+                        'Upgrade to Pro to unlock 100 recordings and 8 hours '
+                        'of transcription every month.',
                   textAlign: TextAlign.center,
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: fgMuted,

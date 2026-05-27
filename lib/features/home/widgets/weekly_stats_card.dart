@@ -143,9 +143,13 @@ class WeeklyStatsCard extends StatelessWidget {
     }
 
     // Remaining summary line for non-developer accounts.
+    final trialExhausted = usage?.trialExhausted ?? false;
     final String? remainingSummary;
     if (isDeveloper) {
       remainingSummary = null;
+    } else if (trialExhausted && !isPro) {
+      remainingSummary = 'Your free trial has been used. '
+          'Upgrade to Pro to continue recording.';
     } else if (atCap) {
       remainingSummary = 'You have reached your monthly cap. '
           'Upgrade to Pro for more recordings.';

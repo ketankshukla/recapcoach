@@ -49,6 +49,7 @@ dependencies:
 
   # Networking
   dio: ^5.7.0
+  http: ^1.2.2
 
   # UI helpers
   flutter_svg: ^2.0.10+1

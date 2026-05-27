@@ -1,6 +1,10 @@
+import 'dart:convert';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:http/http.dart' as http;
 
+import '../../core/config/env.dart';
 import '../../core/logging/logger.dart';
 
 class AuthRepository {
@@ -74,9 +78,53 @@ class AuthRepository {
     await _auth.signOut();
   }
 
+  /// Permanently deletes the user's account via the server-side endpoint.
+  ///
+  /// The server:
+  ///   1. Writes an anonymous SHA-256 hash of the email to `usedTrials`
+  ///      (prevents free-tier re-abuse).
+  ///   2. Deletes all Firestore data (notes, usage, profile).
+  ///   3. Deletes the Firebase Auth user.
+  ///
+  /// After the server call succeeds, we sign out locally.
   Future<void> deleteAccount() async {
     final u = _auth.currentUser;
     if (u == null) return;
-    await u.delete();
+
+    if (!Env.hasBackend) {
+      throw Exception(
+        'Cannot delete account: backend URL is not configured.',
+      );
+    }
+
+    final idToken = await u.getIdToken();
+    final url = Uri.parse('${Env.backendUrl}/api/delete-account');
+    final response = await http.post(
+      url,
+      headers: {
+        'Authorization': 'Bearer $idToken',
+        'Content-Type': 'application/json',
+      },
+    );
+
+    if (response.statusCode != 200) {
+      final body = response.body;
+      String message;
+      try {
+        final json = jsonDecode(body) as Map<String, dynamic>;
+        message = json['error'] as String? ?? body;
+      } catch (_) {
+        message = body;
+      }
+      throw Exception('Account deletion failed: $message');
+    }
+
+    // Server deleted the auth user, so sign out locally.
+    try {
+      await _google.signOut();
+    } catch (e) {
+      logger.warning('Google signOut after delete failed: $e');
+    }
+    await _auth.signOut();
   }
 }

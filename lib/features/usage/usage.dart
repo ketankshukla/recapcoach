@@ -15,6 +15,7 @@ class UsageSnapshot {
     required this.limitRecordings,
     required this.limitPerRecordingSeconds,
     this.isDeveloper = false,
+    this.trialExhausted = false,
   });
 
   /// 'free' or 'pro'.
@@ -38,6 +39,11 @@ class UsageSnapshot {
   /// build (see `lib/core/config/developer.dart`).
   final bool isDeveloper;
 
+  /// When true, this free-tier user previously deleted an account and
+  /// cannot re-use the free trial. They must upgrade to Pro to record.
+  /// The flag is written by the server to `/users/{uid}.trialExhausted`.
+  final bool trialExhausted;
+
   /// Free plan defaults — must stay in sync with `api/_lib/limits.ts`.
   static const freeLimitSeconds = 900;        // 15 min
   static const freeLimitRecordings = 5;
@@ -52,6 +58,7 @@ class UsageSnapshot {
     required String plan,
     required String monthKey,
     bool isDeveloper = false,
+    bool trialExhausted = false,
   }) {
     final isPro = plan == 'pro';
     return UsageSnapshot(
@@ -64,6 +71,7 @@ class UsageSnapshot {
       limitPerRecordingSeconds:
           isPro ? proLimitPerRecordingSeconds : freeLimitPerRecordingSeconds,
       isDeveloper: isDeveloper,
+      trialExhausted: trialExhausted,
     );
   }
 
@@ -72,6 +80,7 @@ class UsageSnapshot {
     required String monthKey,
     required Map<String, dynamic>? data,
     bool isDeveloper = false,
+    bool trialExhausted = false,
   }) {
     final isPro = plan == 'pro';
     return UsageSnapshot(
@@ -84,6 +93,7 @@ class UsageSnapshot {
       limitPerRecordingSeconds:
           isPro ? proLimitPerRecordingSeconds : freeLimitPerRecordingSeconds,
       isDeveloper: isDeveloper,
+      trialExhausted: trialExhausted,
     );
   }
 
@@ -105,10 +115,12 @@ class UsageSnapshot {
     return p.isNaN ? 0 : p.clamp(0.0, 1.0);
   }
 
-  /// True when either the minute cap or the recording-count cap is exhausted.
+  /// True when either the minute cap or the recording-count cap is exhausted,
+  /// or when the user's free trial has been previously used up.
   /// Always false for developer accounts (the bypass mirrored on the server).
   bool get isAtCap {
     if (isDeveloper) return false;
+    if (trialExhausted && plan == 'free') return true;
     return usedSeconds >= limitSeconds || usedRecordings >= limitRecordings;
   }
 

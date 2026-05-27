@@ -112,7 +112,7 @@ export default async function handler(
   // ---- 1. Load quota context (also checks kill switch) ----
   let ctx;
   try {
-    ctx = await loadQuotaContext(user.uid);
+    ctx = await loadQuotaContext(user.uid, user.email);
   } catch (err) {
     if (err instanceof TranscriptionDisabledError) {
       res.status(503).json({ error: err.message });
@@ -124,14 +124,19 @@ export default async function handler(
   }
   console.log(
     `[transcribe] uid=${user.uid} plan=${ctx.plan} isDeveloper=${ctx.isDeveloper} ` +
+      `trialExhausted=${ctx.trialExhausted} ` +
       `used=${ctx.used.seconds}s/${ctx.used.count}rec ` +
       `caps=${ctx.limits.maxMonthlySeconds}s/${ctx.limits.maxMonthlyRecordings}rec`
   );
 
   // Quick early bail-out: if the user has already hit the per-month recording
-  // count, we don't need to bother parsing the upload.
+  // count OR previously exhausted their trial, reject before parsing upload.
   // Developers bypass this check so they can keep testing.
-  if (!ctx.isDeveloper && ctx.used.count >= ctx.limits.maxMonthlyRecordings) {
+  if (
+    !ctx.isDeveloper &&
+    (ctx.used.count >= ctx.limits.maxMonthlyRecordings ||
+      (ctx.trialExhausted && ctx.plan === "free"))
+  ) {
     return respondQuotaExceeded(
       res,
       new QuotaExceededError(

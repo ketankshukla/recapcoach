@@ -21,6 +21,7 @@
  * the counters.  See firestore.rules.
  */
 
+import { createHash } from "crypto";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import {
   FREE_LIMITS,
@@ -140,16 +141,46 @@ export interface QuotaContext {
    * Console -- it's admin-only writable per `firestore.rules`.
    */
   isDeveloper: boolean;
+  /**
+   * `true` when the user previously deleted their account and an anonymous
+   * SHA-256 hash of their email exists in the `usedTrials` collection.
+   * When true AND plan === 'free', the user should be forced to upgrade
+   * (they cannot re-use the free trial).
+   */
+  trialExhausted: boolean;
 }
 
 /**
  * Build the user's quota context (plan + effective limits + current usage).
  * Throws TranscriptionDisabledError if the global kill switch is flipped.
  */
-export async function loadQuotaContext(uid: string): Promise<QuotaContext> {
-  const [cfg, plan] = await Promise.all([
+const HASH_SALT = "recapcoach-trial-v1";
+
+function hashEmail(email: string): string {
+  return createHash("sha256")
+    .update(`${HASH_SALT}:${email.toLowerCase().trim()}`)
+    .digest("hex");
+}
+
+/**
+ * Check if the user's email hash exists in the `usedTrials` collection.
+ * Returns true if this email previously deleted an account.
+ */
+async function checkTrialUsed(email: string | undefined): Promise<boolean> {
+  if (!email) return false;
+  const hash = hashEmail(email);
+  const snap = await getFirestore().doc(`usedTrials/${hash}`).get();
+  return snap.exists;
+}
+
+export async function loadQuotaContext(
+  uid: string,
+  email?: string
+): Promise<QuotaContext> {
+  const [cfg, plan, trialExhausted] = await Promise.all([
     readGlobalConfig(),
     readUserPlan(uid),
+    checkTrialUsed(email),
   ]);
   if (!cfg.transcriptionEnabled) {
     throw new TranscriptionDisabledError();
@@ -169,7 +200,22 @@ export async function loadQuotaContext(uid: string): Promise<QuotaContext> {
   const monthKey = currentMonthKey();
   const used = await readMonthlyUsage(uid, monthKey);
   const isDeveloper = cfg.developerUids.includes(uid);
-  return { plan, limits, used, monthKey, isDeveloper };
+
+  // If the user previously deleted their account and re-signed-up on
+  // the free plan, write a `trialExhausted` flag to their profile doc
+  // so the client can detect it without needing to hash the email.
+  // This is a one-time write; subsequent reads are free.
+  if (trialExhausted && plan === "free" && !isDeveloper) {
+    try {
+      await getFirestore()
+        .doc(`users/${uid}`)
+        .set({ trialExhausted: true }, { merge: true });
+    } catch (err) {
+      console.error("[quota] Failed to stamp trialExhausted flag:", err);
+    }
+  }
+
+  return { plan, limits, used, monthKey, isDeveloper, trialExhausted };
 }
 
 /** Enforce hard file-size cap BEFORE we even parse the upload body. */
@@ -199,6 +245,18 @@ export function assertWithinMonthlyQuota(
   ctx: QuotaContext
 ): void {
   if (ctx.isDeveloper) return; // developer bypass
+
+  // Block free-tier users who previously deleted an account.
+  if (ctx.trialExhausted && ctx.plan === "free") {
+    throw new QuotaExceededError(
+      "Free trial already used. Please upgrade to Pro to continue recording.",
+      "monthly_recordings",
+      ctx.plan,
+      ctx.limits,
+      ctx.used
+    );
+  }
+
   if (audioSeconds > ctx.limits.maxRecordingSeconds) {
     throw new QuotaExceededError(
       `Recording is ${Math.ceil(audioSeconds)}s; ${ctx.plan} plan allows max ${
