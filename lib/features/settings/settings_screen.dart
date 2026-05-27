@@ -12,6 +12,7 @@ import '../../core/theme/app_spacing.dart';
 import '../../core/widgets/glass/glass_alert_dialog.dart';
 import '../../core/widgets/glass/glass_icon_button.dart';
 import '../auth/auth_providers.dart';
+import '../notes/note_providers.dart';
 import '../home/widgets/glass_card.dart';
 import '../home/widgets/mesh_gradient_background.dart';
 import '../paywall/entitlement_provider.dart';
@@ -69,6 +70,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (confirmed != true) return;
     try {
       await ref.read(purchasesServiceProvider).logOut();
+      // Clear local notes cache before the server deletes the auth user,
+      // so the Hive stream doesn't hold stale data during teardown.
+      await ref.read(noteRepositoryProvider).clearAllLocalOnly();
       await ref.read(authRepositoryProvider).deleteAccount();
       ref.read(analyticsProvider).track(AnalyticsEvents.accountDelete);
     } catch (e) {

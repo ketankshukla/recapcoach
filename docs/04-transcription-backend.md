@@ -1,6 +1,6 @@
 # 04 — Transcription backend
 
-> **Commits:** `ee3261d` *(Phase 2D: Vercel /api/transcribe (Whisper + gpt-4o-mini) + Flutter wiring)* and `c8d7841` *(Add public/index.html landing page so Vercel build does not fail)*
+> **Commits:** `ee3261d` _(Phase 2D: Vercel /api/transcribe (Whisper + gpt-4o-mini) + Flutter wiring)_ and `c8d7841` _(Add public/index.html landing page so Vercel build does not fail)_
 
 This chapter covers the **Vercel serverless backend** that turns an uploaded `.m4a` file into a transcript + summary + action items, and the **Flutter client** that talks to it.
 
@@ -26,11 +26,17 @@ We host on **Vercel** because:
 
 ```
 api/
-├─ transcribe.ts        The serverless function
+├─ transcribe.ts        The serverless function (POST /api/transcribe)
+├─ delete-account.ts    Account deletion + trial-abuse hash (POST /api/delete-account)
+├─ _lib/
+│  ├─ firebase-admin.ts Auth verification helper
+│  ├─ quota.ts          Quota context, enforcement, usage recording
+│  ├─ limits.ts         Plan limit constants
+│  └─ audio-meta.ts     Audio duration probe
 └─ README.md            Operator notes
 package.json            Backend deps (openai, formidable, @vercel/node)
 tsconfig.json           TypeScript config for the function
-vercel.json             Output dir + function timeout
+vercel.json             Output dir + function timeout + per-endpoint config
 public/index.html       Tiny landing page so Vercel's "Other" preset finds an output dir
 .vercelignore           Excludes the Flutter project from the build
 ```
@@ -66,18 +72,18 @@ export const config = { api: { bodyParser: false } };
 ```ts
 const transcription = await openai.audio.transcriptions.create({
   file: fs.createReadStream(audioPath),
-  model: 'whisper-1',
-  response_format: 'json',
+  model: "whisper-1",
+  response_format: "json",
 });
 ```
 
 Tradeoffs considered:
 
-| Choice | Pros | Cons | Verdict |
-|---|---|---|---|
-| `whisper-1` | Best accuracy, broad language support | $0.006 / minute | **Used** — quality matters most |
-| `gpt-4o-transcribe` | Newer, sometimes faster | More expensive, less battle-tested | Skipped |
-| On-device speech-to-text | Free, private | Quality is much worse, Android STT requires Google Play Services | Skipped |
+| Choice                   | Pros                                  | Cons                                                             | Verdict                         |
+| ------------------------ | ------------------------------------- | ---------------------------------------------------------------- | ------------------------------- |
+| `whisper-1`              | Best accuracy, broad language support | $0.006 / minute                                                  | **Used** — quality matters most |
+| `gpt-4o-transcribe`      | Newer, sometimes faster               | More expensive, less battle-tested                               | Skipped                         |
+| On-device speech-to-text | Free, private                         | Quality is much worse, Android STT requires Google Play Services | Skipped                         |
 
 ### gpt-4o-mini for summary + action items
 
@@ -100,12 +106,12 @@ If the LLM call fails mid-pipeline, we **still return the transcript with 200** 
 
 ### Error envelope
 
-| HTTP | When |
-|---|---|
-| 200 | Happy path or transcript-only-fallback. Frontend reads `summary`, `actionItems`, optional `warning`. |
-| 400 | Missing or corrupt `audio` field. |
-| 405 | Wrong HTTP method (anything other than POST). |
-| 500 | `OPENAI_API_KEY` missing, or Whisper itself errored. |
+| HTTP | When                                                                                                 |
+| ---- | ---------------------------------------------------------------------------------------------------- |
+| 200  | Happy path or transcript-only-fallback. Frontend reads `summary`, `actionItems`, optional `warning`. |
+| 400  | Missing or corrupt `audio` field.                                                                    |
+| 405  | Wrong HTTP method (anything other than POST).                                                        |
+| 500  | `OPENAI_API_KEY` missing, or Whisper itself errored.                                                 |
 
 ## The frontend: `TranscriptionService`
 
@@ -128,14 +134,14 @@ Timeouts chosen for real-world calls:
 
 Two issues hit during the first deploy:
 
-1. **No `public/` directory** → Vercel failed with *"No Output Directory named 'public' found"*. Fix: added a tiny `public/index.html` landing page (commit `c8d7841`). Side benefit: visiting the bare URL now shows a polished "RecapCoach API — ONLINE" page.
+1. **No `public/` directory** → Vercel failed with _"No Output Directory named 'public' found"_. Fix: added a tiny `public/index.html` landing page (commit `c8d7841`). Side benefit: visiting the bare URL now shows a polished "RecapCoach API — ONLINE" page.
 2. **`.vercelignore`** had to be added to exclude the Flutter project (Android/iOS/lib) from the build context — otherwise Vercel would try to "build" Flutter assets.
 
 ### Env vars to set in Vercel project settings
 
-| Key | Value | Encrypted? |
-|---|---|---|
-| `OPENAI_API_KEY` | `sk-...` | Yes |
+| Key              | Value    | Encrypted? |
+| ---------------- | -------- | ---------- |
+| `OPENAI_API_KEY` | `sk-...` | Yes        |
 
 ### Deployment URL
 
@@ -192,21 +198,21 @@ User sees populated summary + action items + transcript in the detail screen
 
 For one 10-minute call:
 
-| Step | Cost |
-|---|---|
-| Whisper-1 transcription | 10 min × $0.006 = **$0.06** |
+| Step                                                         | Cost                                          |
+| ------------------------------------------------------------ | --------------------------------------------- |
+| Whisper-1 transcription                                      | 10 min × $0.006 = **$0.06**                   |
 | gpt-4o-mini summary (~3000 input tokens, ~300 output tokens) | ~3000 × $0.15/M + 300 × $0.60/M = **$0.0006** |
-| **Total per call** | **~$0.06** |
+| **Total per call**                                           | **~$0.06**                                    |
 
 A user doing 5 calls/day @ 10 min each = $9/month in OpenAI costs. At a $19/month subscription price, gross margin is ~50%. The math works.
 
 ## Open problems (deferred)
 
-| Problem | Fix planned |
-|---|---|
+| Problem                                                    | Fix planned                                                                             |
+| ---------------------------------------------------------- | --------------------------------------------------------------------------------------- |
 | Endpoint is **anonymous** — anyone with the URL can hit it | Add Firebase ID token verification on the function (see [08-roadmap.md](08-roadmap.md)) |
-| No rate limiting | After auth lockdown, add per-uid quota |
-| 25 MB hard cap means ~50 min of audio max | Chunk audio client-side before upload for longer calls |
+| No rate limiting                                           | After auth lockdown, add per-uid quota                                                  |
+| 25 MB hard cap means ~50 min of audio max                  | Chunk audio client-side before upload for longer calls                                  |
 
 ## Next chapter
 

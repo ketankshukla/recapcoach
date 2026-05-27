@@ -118,6 +118,8 @@ a live meter; it cannot write that doc (firestore.rules locks it down).
   are now **read-only from the client**; only the backend (service account)
   can write them. Notes (`/users/{uid}/notes/{noteId}`) remain CRUD by the
   owner. `/config/global` is admin-only on both reads and writes.
+  `/usedTrials/{hash}` is server-only (written by the delete-account
+  endpoint, read by `loadQuotaContext`).
 
 ---
 
@@ -125,7 +127,8 @@ a live meter; it cannot write that doc (firestore.rules locks it down).
 
 ```
 /users/{uid}
-  plan: 'free' | 'pro'                  # mirrored from RevenueCat webhook (future)
+  plan:            'free' | 'pro'       # mirrored from RevenueCat webhook (future)
+  trialExhausted:  bool                 # true if this email previously deleted an account
   ...
 
 /users/{uid}/notes/{noteId}
@@ -141,6 +144,9 @@ a live meter; it cannot write that doc (firestore.rules locks it down).
   transcriptionEnabled:  bool            # kill switch
   freeOverride:          PlanLimits?     # runtime override
   proOverride:           PlanLimits?
+
+/usedTrials/{sha256-hash}               # anonymous trial-abuse prevention
+  createdAt:  Timestamp                  # when the account was deleted
 ```
 
 `YYYY-MM` keys are **UTC** so all users roll over at the same instant
@@ -252,6 +258,36 @@ right user-facing message.
   every call. No caching.
 - **Counters never decrement.** Refunds, cancellations, etc. do not roll
   back usage. The next month starts fresh.
+
+---
+
+## Account deletion & trial abuse prevention
+
+The **`/api/delete-account`** endpoint handles full account deletion:
+
+1. Verifies Firebase ID token.
+2. Looks up the user's email from Firebase Auth.
+3. Writes `SHA-256(salt + email)` to `/usedTrials/{hash}`. The hash is
+   irreversible and is NOT personal data — it cannot be used to recover
+   the email. This is GDPR-compatible.
+4. Deletes all Firestore data: notes, usage docs, profile doc.
+5. Deletes the Firebase Auth user.
+
+When a user re-registers with the same email, `loadQuotaContext()` hashes
+the email again and checks `/usedTrials/{hash}`. If found:
+
+- `trialExhausted` is set to `true` on the `QuotaContext`.
+- The server writes `trialExhausted: true` to `/users/{uid}` so the
+  client can detect it without hashing.
+- `assertWithinMonthlyQuota()` blocks the request if the user is on the
+  free plan.
+- The client shows a "Free trial used" upgrade prompt instead of the
+  normal "Monthly cap reached" message.
+
+Pro users who previously deleted an account are unaffected — the check
+only blocks `plan === 'free'`.
+
+The salt is `recapcoach-trial-v1` (not secret, just namespace isolation).
 
 ---
 

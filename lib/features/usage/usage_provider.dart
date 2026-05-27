@@ -71,14 +71,21 @@ final monthlyUsageProvider = StreamProvider<UsageSnapshot>((ref) async* {
     trialExhausted: trialExhausted,
   );
 
-  await for (final snap in doc.snapshots()) {
-    yield UsageSnapshot.fromFirestore(
-      plan: plan,
-      monthKey: monthKey,
-      data: snap.data(),
-      isDeveloper: isDeveloper,
-      trialExhausted: trialExhausted,
-    );
+  try {
+    await for (final snap in doc.snapshots()) {
+      yield UsageSnapshot.fromFirestore(
+        plan: plan,
+        monthKey: monthKey,
+        data: snap.data(),
+        isDeveloper: isDeveloper,
+        trialExhausted: trialExhausted,
+      );
+    }
+  } catch (e) {
+    // After account deletion the Firestore listener fires one last
+    // time with PERMISSION_DENIED because the auth token is gone.
+    // Swallow the error silently — the auth state listener will
+    // redirect to the sign-in screen momentarily.
   }
 });
 
