@@ -160,6 +160,12 @@ class _HomeBody extends StatelessWidget {
         const SizedBox(height: AppSpacing.md),
         const HomeEmptyState(),
       ] else ...[
+        // Show upgrade card above recordings when cap is reached.
+        if ((usage?.isAtCap ?? false) && !(usage?.isDeveloper ?? false)) ...[
+          _CapExhaustedState(
+            onUpgrade: () => context.push(AppRoutes.paywall),
+          ),
+        ],
         const _SectionHeader(label: 'RECENT RECORDINGS'),
         const SizedBox(height: AppSpacing.xs),
         for (final n in notes) ...[
